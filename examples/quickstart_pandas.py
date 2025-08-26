@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 
 # Add src to PYTHONPATH for local runs
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
@@ -12,7 +13,14 @@ import requests
 import time
 import pandas as pd
 
-base_url = 'https://aurorabapenv0f528.crm10.dynamics.com'
+if not sys.stdin.isatty():
+	print("Interactive input required for org URL. Run this script in a TTY.")
+	sys.exit(1)
+entered = input("Enter Dataverse org URL (e.g. https://yourorg.crm.dynamics.com): ").strip()
+if not entered:
+	print("No URL entered; exiting.")
+	sys.exit(1)
+base_url = entered.rstrip('/')
 client = DataverseClient(base_url=base_url, credential=InteractiveBrowserCredential())
 # Use the internal OData client for pandas helpers
 PANDAS = PandasODataClient(client._get_odata())

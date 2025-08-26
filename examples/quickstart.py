@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 
 # Add src to PYTHONPATH for local runs
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
@@ -9,8 +10,15 @@ from azure.identity import InteractiveBrowserCredential
 import traceback
 import requests
 import time
- 
-base_url = 'https://aurorabapenv0f528.crm10.dynamics.com'
+
+if not sys.stdin.isatty():
+	print("Interactive input required for org URL. Run this script in a TTY.")
+	sys.exit(1)
+entered = input("Enter Dataverse org URL (e.g. https://yourorg.crm.dynamics.com): ").strip()
+if not entered:
+	print("No URL entered; exiting.")
+	sys.exit(1)
+base_url = entered.rstrip('/')
 client = DataverseClient(base_url=base_url, credential=InteractiveBrowserCredential())
 
 # Small helpers: call logging and step pauses
@@ -259,50 +267,34 @@ except Exception as e:
 # 4) Query records via SQL Custom API
 print("Query (SQL via Custom API):")
 try:
-	# Try singular logical name first, then plural entity set, with short backoff
 	import time
-
-	candidates = [logical]
-	if entity_set and entity_set != logical:
-		candidates.append(entity_set)
-
-	# Show planned SQL queries before executing
-	for name in candidates:
-		plan_call(f"client.query_sql(\"SELECT TOP 2 * FROM {name} ORDER BY {attr_prefix}_amount DESC\")")
+	plan_call(f"client.query_sql(\"SELECT TOP 2 * FROM {logical} ORDER BY {attr_prefix}_amount DESC\")")
 	pause("Execute SQL Query")
 
-	rows = []
-	for name in candidates:
-		def _run_query():
-			log_call(f"client.query_sql(\"SELECT TOP 2 * FROM {name} ORDER BY {attr_prefix}_amount DESC\")")
-			return client.query_sql(f"SELECT TOP 2 * FROM {name} ORDER BY {attr_prefix}_amount DESC")
-		def _retry_if(ex: Exception) -> bool:
-			msg = str(ex) if ex else ""
-			return ("Invalid table name" in msg) or ("Invalid object name" in msg)
-		try:
-			rows = backoff_retry(_run_query, delays=(0, 2, 5), retry_http_statuses=(), retry_if=_retry_if)
-			logical_for_ids = logical
-			id_key = f"{logical_for_ids}id"
-			ids = [r.get(id_key) for r in rows if isinstance(r, dict) and r.get(id_key)]
-			print({"entity": name, "rows": len(rows) if isinstance(rows, list) else 0, "ids": ids})
-			# Print TDS summaries for clarity
-			tds_summaries = []
-			for row in rows if isinstance(rows, list) else []:
-				tds_summaries.append(
-					{
-						"id": row.get(id_key),
-						"code": row.get(code_key),
-						"count": row.get(count_key),
-						"amount": row.get(amount_key),
-						"when": row.get(when_key),
-					}
-				)
-			print_line_summaries("TDS record summaries (top 2 by amount):", tds_summaries)
-			raise SystemExit
-		except Exception:
-			continue
-except SystemExit:
-	pass
+	def _run_query():
+		log_call(f"client.query_sql(\"SELECT TOP 2 * FROM {logical} ORDER BY {attr_prefix}_amount DESC\")")
+		return client.query_sql(f"SELECT TOP 2 * FROM {logical} ORDER BY {attr_prefix}_amount DESC")
+
+	def _retry_if(ex: Exception) -> bool:
+		msg = str(ex) if ex else ""
+		return ("Invalid table name" in msg) or ("Invalid object name" in msg)
+
+	rows = backoff_retry(_run_query, delays=(0, 2, 5), retry_http_statuses=(), retry_if=_retry_if)
+	id_key = f"{logical}id"
+	ids = [r.get(id_key) for r in rows if isinstance(r, dict) and r.get(id_key)]
+	print({"entity": logical, "rows": len(rows) if isinstance(rows, list) else 0, "ids": ids})
+	tds_summaries = []
+	for row in rows if isinstance(rows, list) else []:
+		tds_summaries.append(
+			{
+				"id": row.get(id_key),
+				"code": row.get(code_key),
+				"count": row.get(count_key),
+				"amount": row.get(amount_key),
+				"when": row.get(when_key),
+			}
+		)
+	print_line_summaries("TDS record summaries (top 2 by amount):", tds_summaries)
 except Exception as e:
 	print(f"SQL via Custom API failed: {e}")
 # 5) Delete record

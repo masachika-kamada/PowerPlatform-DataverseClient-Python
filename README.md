@@ -139,8 +139,6 @@ Notes:
 - For CRUD methods that take a record id, pass the GUID string (36-char hyphenated). Parentheses around the GUID are accepted but not required.
 - SQL is routed through the Custom API named in `DataverseConfig.sql_api_name` (default: `McpExecuteSqlQuery`).
 
-
-
 ### Pandas helpers
 
 See `examples/quickstart_pandas.py` for a DataFrame workflow via `PandasODataClient`.
@@ -152,6 +150,7 @@ VS Code Tasks
 ## Limitations / Future Work
 - No batching, upsert, or association operations yet.
 - Minimal retry policy in library (network-error only); examples include additional backoff for transient Dataverse consistency.
+- Entity naming conventions in Dataverse (schema/logical/entity set plural & publisher prefix) using the SDK is currently not well-defined
 
 ## Contributing
 
