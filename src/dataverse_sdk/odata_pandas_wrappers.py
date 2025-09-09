@@ -4,10 +4,11 @@ These helpers allow using pandas DataFrames / Series / Indexes as inputs and
 outputs for common CRUD + query operations.
 
 Design notes:
-* All methods are thin convenience wrappers for pandas-specific functionality.
-* For creating records, use the core ODataClient.create() method directly - it
-  natively supports pandas DataFrames and Series with batch processing.
-* update: updates records based on an id column; returns a DataFrame with
+* All methods are thin convenience wrappers that iterate row-by-row; no OData
+  batch requests are issued (future enhancement opportunity).
+* create_df: creates one record per row, returning a new DataFrame with an
+  added id column (default name 'id').
+* update_df: updates records based on an id column; returns a DataFrame with
   per-row success booleans and optional error messages.
 * delete_ids: deletes a collection of ids (Series, list, or Index) returning a
   DataFrame summarizing success/failure.
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence, Any
+import re
 import json
 
 import pandas as pd
@@ -50,6 +52,34 @@ class PandasODataClient:
 
     def __init__(self, odata_client: ODataClient) -> None:
         self._c = odata_client
+
+    # ---------------------------- Create ---------------------------------
+    def create_df(self, entity_set: str, record: pd.Series) -> str:
+        """Create a single record from a pandas Series and return the GUID.
+
+        Parameters
+        ----------
+        entity_set : str
+            Target Dataverse entity set name (entity set logical plural).
+        record : pandas.Series
+            Series whose index labels are field logical names.
+
+        Returns
+        -------
+        str
+            The created record's GUID.
+        """
+        if not isinstance(record, pd.Series):
+            raise TypeError("record must be a pandas Series")
+        payload = {k: v for k, v in record.items()}
+        created = self._c.create(entity_set, payload)
+        # Extract primary id from returned representation (first '*id' that looks like a GUID)
+        if isinstance(created, dict):
+            for k, v in created.items():
+                if isinstance(k, str) and k.lower().endswith("id") and isinstance(v, (str,)):
+                    if re.fullmatch(r"[0-9a-fA-F-]{36}", v.strip() or ""):
+                        return v
+        raise RuntimeError("Could not determine created record id from returned representation")
 
     # ---------------------------- Update ---------------------------------
     def update(self, entity_set: str, record_id: str, entity_data: pd.Series) -> None:

@@ -58,12 +58,11 @@ print("Ensure custom table exists (Metadata):")
 table_info = None
 created_this_run = False
 
-# Check for existing table using list_tables
-log_call("client.list_tables()")
-tables = client.list_tables()
-existing_table = next((t for t in tables if t.get("SchemaName") == "new_SampleItem"), None)
-if existing_table:
-	table_info = client.get_table_info("new_SampleItem")
+# First check for existing table
+log_call("client.get_table_info('SampleItem')")
+existing = client.get_table_info("SampleItem")
+if existing:
+	table_info = existing
 	created_this_run = False
 	print({
 		"table": table_info.get("entity_schema"),
@@ -72,12 +71,13 @@ if existing_table:
 		"logical": table_info.get("entity_logical_name"),
 		"metadata_id": table_info.get("metadata_id"),
 	})
+
 else:
 	# Create it since it doesn't exist
 	try:
 		log_call("client.create_table('SampleItem', schema={code,count,amount,when,active})")
 		table_info = client.create_table(
-			"new_SampleItem",
+			"SampleItem",
 			{
 				"code": "string",
 				"count": "int",
@@ -139,8 +139,12 @@ def print_line_summaries(label: str, summaries: list[dict]) -> None:
 
 # 2) Create a record in the new table
 print("Create records (OData):")
-
-# Prepare payloads
+# Show planned creates before executing
+for _ in range(3):
+	plan_call(f"client.create('{entity_set}', payload)")
+pause("Execute Create")
+record_ids: list[str] = []
+created_recs: list[dict] = []
 create_payloads = [
 	{
 		f"{attr_prefix}_name": "Sample A",
@@ -168,41 +172,14 @@ create_payloads = [
 	},
 ]
 
-# Show planned creates before executing
-plan_call(f"client.create('{entity_set}', single_payload)")
-plan_call(f"client.create('{entity_set}', [payload, ...])")
-pause("Execute Create")
-record_ids: list[str] = []
-created_recs: list[dict] = []
-
 try:
-	# Create the first record
-	single_payload = create_payloads[0]
-	log_call(f"client.create('{entity_set}', single_payload)")
-	rec = backoff_retry(lambda: client.create(entity_set, single_payload))
-	created_recs.append(rec)
-	rid = rec.get(id_key)
-	if rid:
-		record_ids.append(rid)
-
-	# Create the remaining records in a single batch call
-	batch_payloads = create_payloads[1:]
-	if batch_payloads:
-		log_call(f"client.create('{entity_set}', batch_payloads)")
-		batch_recs = backoff_retry(lambda: client.create(entity_set, batch_payloads))
-		# If the batch call returns a list, extend; else, append
-		if isinstance(batch_recs, list):
-			created_recs.extend(batch_recs)
-			for rec in batch_recs:
-				rid = rec.get(id_key)
-				if rid:
-					record_ids.append(rid)
-		else:
-			created_recs.append(batch_recs)
-			rid = batch_recs.get(id_key)
-			if rid:
-				record_ids.append(rid)
-
+	for payload in create_payloads:
+		log_call(f"client.create('{entity_set}', payload)")
+		rec = backoff_retry(lambda p=payload: client.create(entity_set, p))
+		created_recs.append(rec)
+		rid = rec.get(id_key)
+		if rid:
+			record_ids.append(rid)
 	print({"entity": logical, "created_ids": record_ids})
 	# Summarize the created records from the returned payloads
 	summaries = []
@@ -344,11 +321,11 @@ pause("Next: Cleanup table")
 print("Cleanup (Metadata):")
 try:
 	# Delete if present, regardless of whether it was created in this run
-	log_call("client.get_table_info('new_SampleItem')")
-	info = client.get_table_info("new_SampleItem")
+	log_call("client.get_table_info('SampleItem')")
+	info = client.get_table_info("SampleItem")
 	if info:
-		log_call("client.delete_table('new_SampleItem')")
-		client.delete_table("new_SampleItem")
+		log_call("client.delete_table('SampleItem')")
+		client.delete_table("SampleItem")
 		print({"table_deleted": True})
 	else:
 		print({"table_deleted": False, "reason": "not found"})

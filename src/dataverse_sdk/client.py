@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List, Union
+from typing import Any, Dict, Optional
 
 from azure.core.credentials import TokenCredential
 
@@ -63,29 +63,25 @@ class DataverseClient:
         return self._odata
 
     # CRUD
-    def create(self, entity: str, record_data: Union[Dict[str, Any], List[Dict[str, Any]], Any]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
-        """Create one or more records and return their full representation(s).
+    def create(self, entity: str, record_data: dict) -> dict:
+        """Create a record and return its full representation.
 
         Parameters
         ----------
         entity : str
             Entity set name (plural logical name), e.g., ``"accounts"``.
-        record_data : dict, list of dict, or pandas.DataFrame
-            Single record (dict), list of records, or pandas DataFrame with field-value pairs.
+        record_data : dict
+            Field-value pairs to set on the new record.
 
         Returns
         -------
-        dict or list of dict
-            For single record: the created record as returned by the Web API.
-            For multiple records: list of created records.
-            Records are created using batch requests with a batch size of 25 for optimal performance.
+        dict
+            The created record as returned by the Web API (``Prefer: return=representation``).
 
         Raises
         ------
         requests.exceptions.HTTPError
             If the request fails (via ``raise_for_status`` in the underlying client).
-        TypeError
-            If record_data is not a supported type (dict, list, or pandas DataFrame).
         """
         return self._get_odata().create(entity, record_data)
 
@@ -200,15 +196,6 @@ class DataverseClient:
         """
         self._get_odata().delete_table(tablename)
 
-    def list_tables(self) -> list[str]:
-        """List all custom tables in the Dataverse environment.
-
-        Returns
-        -------
-        list[str]
-            A list of table names.
-        """
-        return self._get_odata().list_tables()
 
 __all__ = ["DataverseClient"]
         
