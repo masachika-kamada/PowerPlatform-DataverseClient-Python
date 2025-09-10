@@ -4,7 +4,7 @@ A minimal Python SDK to use Microsoft Dataverse as a database for Azure AI Found
 
 - Read (SQL) — Execute read-only T‑SQL via the McpExecuteSqlQuery Custom API. Returns `list[dict]`.
 - OData CRUD — Thin wrappers over Dataverse Web API (create/get/update/delete).
-- Bulk create — Pass a list of records to `create(...)` to invoke the bound `CreateMultiple` action; returns `list[str]` of GUIDs.
+- Bulk create — Pass a list of records to `create(...)` to invoke the bound `CreateMultiple` action; returns `list[str]` of GUIDs. If `@odata.type` is absent the SDK resolves the logical name from metadata (cached).
 - Retrieve multiple (paging) — Generator-based `get_multiple(...)` that yields pages, supports `$top` and Prefer: `odata.maxpagesize` (`page_size`).
 - Metadata helpers — Create/inspect/delete simple custom tables (EntityDefinitions + Attributes).
 - Pandas helpers — Convenience DataFrame oriented wrappers for quick prototyping/notebooks.
@@ -127,6 +127,9 @@ print({"created_ids": ids})
 Notes:
 - The bulk create response typically includes IDs only; the SDK returns the list of GUID strings.
 - Single-record `create` still returns the full entity representation.
+- `@odata.type` handling: If any payload in the list omits `@odata.type`, the SDK performs a one-time metadata query (`EntityDefinitions?$filter=EntitySetName eq '<entity_set>'`) to resolve the logical name, caches it, and stamps each missing item with `Microsoft.Dynamics.CRM.<logical>`. If **all** payloads already include `@odata.type`, no metadata call is made.
+- The metadata lookup is per entity set and reused across subsequent multi-create calls in the same client instance (in-memory cache only).
+- You can explicitly set `@odata.type` yourself (e.g., for polymorphic scenarios); the SDK will not override it.
 
 ## Retrieve multiple with paging
 
@@ -149,16 +152,20 @@ for page in pages:         # each page is a list[dict]
 print({"total_rows": total})
 ```
 
-Parameters
-- `entity`: str — Entity set name (plural logical name), e.g., `"accounts"`.
-- `select`: list[str] | None — Columns to include; joined into `$select`.
-- `filter`: str | None — OData `$filter` expression (e.g., `"contains(name,'Acme') and statecode eq 0"`).
-- `orderby`: list[str] | None — Sort expressions (e.g., `["name asc", "createdon desc"]`).
-- `top`: int | None — Cap on total rows across all pages (sent as `$top` on first request).
-- `expand`: list[str] | None — Navigation expansions as raw OData strings. Example:
-	- `"primarycontactid($select=fullname,emailaddress1)"`
-	- `"parentaccountid($select=name)"`
-- `page_size`: int | None — Per-page hint via Prefer: `odata.maxpagesize=N`.
+Parameters (all optional except `entity_set`)
+- `entity_set`: str — Entity set (plural logical name), e.g., `"accounts"`.
+- `select`: list[str] | None — Columns -> `$select` (comma joined).
+- `filter`: str | None — OData `$filter` expression (e.g., `contains(name,'Acme') and statecode eq 0`).
+- `orderby`: list[str] | None — Sort expressions -> `$orderby` (comma joined).
+- `top`: int | None — Global cap via `$top` (applied on first request; service enforces across pages).
+- `expand`: list[str] | None — Navigation expansions -> `$expand`; pass raw clauses (e.g., `primarycontactid($select=fullname,emailaddress1)`).
+- `page_size`: int | None — Per-page hint using Prefer: `odata.maxpagesize=<N>` (not guaranteed; last page may be smaller).
+
+Return value & semantics
+- Returns a generator yielding non-empty pages (`list[dict]`). Empty pages are skipped.
+- Each yielded list corresponds to a `value` page from the Web API.
+- Iteration stops when no `@odata.nextLink` remains (or when `$top` satisfied server-side).
+- The generator does not materialize all results; pages are fetched lazily.
 
 Example (all parameters + expected response)
 
@@ -193,9 +200,11 @@ for page in pages:  # page is list[dict]
 ```
 
 Semantics:
-- `$top`: caps the total number of rows returned across all pages.
-- `page_size`: per-page size hint via Prefer: `odata.maxpagesize`; the service may return fewer/more.
-- The generator follows `@odata.nextLink` until exhausted or `$top` is satisfied.
+- `$select`, `$filter`, `$orderby`, `$expand`, `$top` map directly to corresponding OData query options on the first request.
+- `$top` caps total rows; the service may partition those rows across multiple pages.
+- `page_size` (Prefer: `odata.maxpagesize`) is a hint; the server decides actual page boundaries.
+- The generator follows `@odata.nextLink` until exhausted (service already accounts for `$top`).
+- Only non-empty pages are yielded; if the first response has no `value`, iteration ends immediately.
 ```
 
 ### Custom table (metadata) example
@@ -248,7 +257,7 @@ VS Code Tasks
 - No general-purpose OData batching, upsert, or association operations yet.
 - `DeleteMultiple`/`UpdateMultiple` are not exposed; quickstart may demonstrate faster deletes using client-side concurrency only.
 - Minimal retry policy in library (network-error only); examples include additional backoff for transient Dataverse consistency.
-- Entity naming conventions in Dataverse (schema/logical/entity set plural & publisher prefix) using the SDK is currently not well-defined
+- Entity naming conventions in Dataverse (schema/logical/entity set plural & publisher prefix) are only partially abstracted; for multi-create the SDK resolves logical names from entity set metadata.
 
 ## Contributing
 

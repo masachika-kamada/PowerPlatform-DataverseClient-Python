@@ -22,6 +22,8 @@ class ODataClient:
             backoff=self.config.http_backoff,
             timeout=self.config.http_timeout,
         )
+        # Cache: entity set name -> logical name (resolved via metadata lookup)
+        self._entityset_logical_cache = {}
 
     def _headers(self) -> Dict[str, str]:
         """Build standard OData headers with bearer auth."""
@@ -42,13 +44,28 @@ class ODataClient:
     def create(self, entity_set: str, data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[Dict[str, Any], List[str]]:
         """Create one or many records.
 
-        Behaviour:
-        - Single (dict): POST /{entity_set} with Prefer: return=representation and return the created record (dict).
-        - Multiple (list[dict]): POST bound action /{entity_set}/Microsoft.Dynamics.CRM.CreateMultiple
-          and return a list[str] of created record GUIDs (server only returns Ids for this action).
+        Parameters
+        ----------
+        entity_set : str
+            Entity set (plural logical name), e.g. "accounts".
+        data : dict | list[dict]
+            Single entity payload or list of payloads for batch create.
 
-        @odata.type is auto-inferred (Microsoft.Dynamics.CRM.<logical>) for each item when doing multi-create
-        if not already supplied.
+        Behaviour
+        ---------
+        - Single (dict): POST /{entity_set} with Prefer: return=representation. Returns created record (dict).
+        - Multiple (list[dict]): POST /{entity_set}/Microsoft.Dynamics.CRM.CreateMultiple. Returns list[str] of created GUIDs.
+
+        Multi-create logical name resolution
+        ------------------------------------
+        - If any payload omits ``@odata.type`` the client performs a metadata lookup (once per entity set, cached)
+          to resolve the logical name and stamps ``Microsoft.Dynamics.CRM.<logical>`` into missing payloads.
+        - If all payloads already include ``@odata.type`` no lookup or modification occurs.
+
+        Returns
+        -------
+        dict | list[str]
+            Created entity (single) or list of created IDs (multi).
         """
         if isinstance(data, dict):
             return self._create_single(entity_set, data)
@@ -71,17 +88,44 @@ class ODataClient:
         except ValueError:
             return {}
 
-    def _infer_logical(self, entity_set: str) -> str:
-        # Basic heuristic: drop trailing 's'. (Metadata lookup could be added later.)
-        return entity_set[:-1] if entity_set.endswith("s") else entity_set
+    def _logical_from_entity_set(self, entity_set: str) -> str:
+        """Resolve logical name from an entity set using metadata (cached)."""
+        es = (entity_set or "").strip()
+        if not es:
+            raise ValueError("entity_set is required")
+        cached = self._entityset_logical_cache.get(es)
+        if cached:
+            return cached
+        url = f"{self.api}/EntityDefinitions"
+        params = {
+            "$select": "LogicalName,EntitySetName",
+            "$filter": f"EntitySetName eq '{es}'",
+        }
+        r = self._request("get", url, headers=self._headers(), params=params)
+        r.raise_for_status()
+        try:
+            body = r.json()
+            items = body.get("value", []) if isinstance(body, dict) else []
+        except ValueError:
+            items = []
+        if not items:
+            raise RuntimeError(f"Unable to resolve logical name for entity set '{es}'. Provide @odata.type explicitly.")
+        logical = items[0].get("LogicalName")
+        if not logical:
+            raise RuntimeError(f"Metadata response missing LogicalName for entity set '{es}'.")
+        self._entityset_logical_cache[es] = logical
+        return logical
 
     def _create_multiple(self, entity_set: str, records: List[Dict[str, Any]]) -> List[str]:
         if not all(isinstance(r, dict) for r in records):
             raise TypeError("All items for multi-create must be dicts")
-        logical = self._infer_logical(entity_set)
+        need_logical = any("@odata.type" not in r for r in records)
+        logical: Optional[str] = None
+        if need_logical:
+            logical = self._logical_from_entity_set(entity_set)
         enriched: List[Dict[str, Any]] = []
         for r in records:
-            if "@odata.type" in r:
+            if "@odata.type" in r or not logical:
                 enriched.append(r)
             else:
                 nr = r.copy()
@@ -104,7 +148,7 @@ class ODataClient:
         ids = body.get("Ids")
         if isinstance(ids, list):
             return [i for i in ids if isinstance(i, str)]
-        # Future-proof: some environments might eventually return value/list of entities.
+
         value = body.get("value")
         if isinstance(value, list):
             # Extract IDs if possible
@@ -128,6 +172,22 @@ class ODataClient:
         return f"({k})"
 
     def update(self, entity_set: str, key: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an existing record and return the updated representation.
+
+        Parameters
+        ----------
+        entity_set : str
+            Entity set name (plural logical name).
+        key : str
+            Record GUID (with or without parentheses) or alternate key.
+        data : dict
+            Partial entity payload.
+
+        Returns
+        -------
+        dict
+            Updated record representation.
+        """
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         headers = self._headers().copy()
         headers["If-Match"] = "*"
@@ -137,6 +197,7 @@ class ODataClient:
         return r.json()
 
     def delete(self, entity_set: str, key: str) -> None:
+        """Delete a record by GUID or alternate key."""
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         headers = self._headers().copy()
         headers["If-Match"] = "*"
@@ -144,6 +205,17 @@ class ODataClient:
         r.raise_for_status()
 
     def get(self, entity_set: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
+        """Retrieve a single record.
+
+        Parameters
+        ----------
+        entity_set : str
+            Entity set name.
+        key : str
+            Record GUID (with or without parentheses) or alternate key syntax.
+        select : str | None
+            Comma separated columns for $select.
+        """
         params = {}
         if select:
             params["$select"] = select
@@ -171,18 +243,20 @@ class ODataClient:
         select : list[str] | None
             Columns to select; joined with commas into $select.
         filter : str | None
-            OData $filter expression as a string.
+            ``$filter`` expression.
         orderby : list[str] | None
             Order expressions; joined with commas into $orderby.
         top : int | None
-            Max number of records across all pages. Passed as $top on the first request; the server will paginate via nextLink as needed.
+            Global cap via ``$top`` (applied on first request; server enforces across pages).
         expand : list[str] | None
-            Navigation properties to expand; joined with commas into $expand.
+            Navigation expansions -> ``$expand``; raw clauses accepted.
+        page_size : int | None
+            Hint for per-page size using Prefer: ``odata.maxpagesize``.
 
         Yields
         ------
         list[dict]
-            A page of records from the Web API (the "value" array for each page).
+            A non-empty page of entities (service ``value`` array). Empty pages are skipped.
         """
 
         # Build headers once; include odata.maxpagesize to force smaller pages for demos/testing
@@ -234,6 +308,23 @@ class ODataClient:
 
     # --------------------------- SQL Custom API -------------------------
     def query_sql(self, tsql: str) -> list[dict[str, Any]]:
+        """Execute a read-only T-SQL query via the configured Custom API.
+
+        Parameters
+        ----------
+        tsql : str
+            SELECT-style Dataverse-supported T-SQL (read-only).
+
+        Returns
+        -------
+        list[dict]
+            Rows materialised as list of dictionaries (empty list if no rows).
+
+        Raises
+        ------
+        RuntimeError
+            If the Custom API response is missing the expected ``queryresult`` property or type is unexpected.
+        """
         payload = {"querytext": tsql}
         headers = self._headers()
         api_name = self.config.sql_api_name
@@ -392,20 +483,38 @@ class ODataClient:
         return None
 
     def get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
-        # Accept tablename as a display/logical root; infer a default schema using 'new_' if not provided.
-        # If caller passes a full SchemaName, use it as-is.
-        schema_name = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"
-        entity_schema = schema_name
-        ent = self._get_entity_by_schema(entity_schema)
+        """Return basic metadata for a custom table if it exists.
+
+        Parameters
+        ----------
+        tablename : str
+            Friendly name or full schema name (with publisher prefix and underscore).
+
+        Returns
+        -------
+        dict | None
+            Metadata summary or ``None`` if not found.
+        """
+        ent = self._get_entity_by_schema(tablename)
         if not ent:
             return None
         return {
-            "entity_schema": ent.get("SchemaName") or entity_schema,
+            "entity_schema": ent.get("SchemaName") or tablename,
             "entity_logical_name": ent.get("LogicalName"),
             "entity_set_name": ent.get("EntitySetName"),
             "metadata_id": ent.get("MetadataId"),
             "columns_created": [],
         }
+    
+    def list_tables(self) -> List[Dict[str, Any]]:
+        """List all tables in the Dataverse, excluding private tables (IsPrivate=true)."""
+        url = f"{self.api}/EntityDefinitions"
+        params = {
+            "$filter": "IsPrivate eq false"
+        }
+        r = self._request("get", url, headers=self._headers(), params=params)
+        r.raise_for_status()
+        return r.json().get("value", [])
 
     def delete_table(self, tablename: str) -> None:
         schema_name = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"

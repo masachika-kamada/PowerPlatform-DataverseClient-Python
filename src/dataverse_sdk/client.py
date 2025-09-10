@@ -227,6 +227,16 @@ class DataverseClient:
         """
         self._get_odata().delete_table(tablename)
 
+    def list_tables(self) -> list[str]:
+        """List all custom tables in the Dataverse environment.
+
+        Returns
+        -------
+        list[str]
+            A list of table names.
+        """
+        return self._get_odata().list_tables()
+
 
 __all__ = ["DataverseClient"]
         
