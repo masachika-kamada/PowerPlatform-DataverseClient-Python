@@ -259,15 +259,11 @@ class ODataClient:
             A non-empty page of entities (service ``value`` array). Empty pages are skipped.
         """
 
-        # Build headers once; include odata.maxpagesize to force smaller pages for demos/testing
         headers = self._headers().copy()
         if page_size is not None:
-            try:
-                ps = int(page_size)
-                if ps > 0:
-                    headers["Prefer"] = f"odata.maxpagesize={ps}"
-            except Exception:
-                pass
+            ps = int(page_size)
+            if ps > 0:
+                headers["Prefer"] = f"odata.maxpagesize={ps}"
 
         def _do_request(url: str, *, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             r = self._request("get", url, headers=headers, params=params)
