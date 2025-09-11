@@ -21,7 +21,7 @@ if not entered:
 	sys.exit(1)
 
 base_url = entered.rstrip('/')
-delete_choice = input("Delete the SampleItem table at end? (Y/n): ").strip() or "y"
+delete_choice = input("Delete the new_SampleItem table at end? (Y/n): ").strip() or "y"
 delete_table_at_end = (str(delete_choice).lower() in ("y", "yes", "true", "1"))
 # Ask once whether to pause between steps during this run
 pause_choice = input("Pause between test steps? (y/N): ").strip() or "n"
@@ -68,11 +68,12 @@ print("Ensure custom table exists (Metadata):")
 table_info = None
 created_this_run = False
 
-# First check for existing table
-log_call("client.get_table_info('SampleItem')")
-existing = client.get_table_info("SampleItem")
-if existing:
-	table_info = existing
+# Check for existing table using list_tables
+log_call("client.list_tables()")
+tables = client.list_tables()
+existing_table = next((t for t in tables if t.get("SchemaName") == "new_SampleItem"), None)
+if existing_table:
+	table_info = client.get_table_info("new_SampleItem")
 	created_this_run = False
 	print({
 		"table": table_info.get("entity_schema"),
@@ -85,9 +86,9 @@ if existing:
 else:
 	# Create it since it doesn't exist
 	try:
-		log_call("client.create_table('SampleItem', schema={code,count,amount,when,active})")
+		log_call("client.create_table('new_SampleItem', schema={code,count,amount,when,active})")
 		table_info = client.create_table(
-			"SampleItem",
+			"new_SampleItem",
 			{
 				"code": "string",
 				"count": "int",
@@ -415,11 +416,11 @@ pause("Next: Cleanup table")
 print("Cleanup (Metadata):")
 if delete_table_at_end:
 	try:
-		log_call("client.get_table_info('SampleItem')")
-		info = client.get_table_info("SampleItem")
+		log_call("client.get_table_info('new_SampleItem')")
+		info = client.get_table_info("new_SampleItem")
 		if info:
-			log_call("client.delete_table('SampleItem')")
-			client.delete_table("SampleItem")
+			log_call("client.delete_table('new_SampleItem')")
+			client.delete_table("new_SampleItem")
 			print({"table_deleted": True})
 		else:
 			print({"table_deleted": False, "reason": "not found"})
