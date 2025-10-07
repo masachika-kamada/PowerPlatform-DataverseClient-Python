@@ -14,7 +14,7 @@ class DataverseClient:
 
     This client exposes a simple, stable surface for:
     - OData CRUD: create, get, update, delete records
-    - SQL (read-only): execute T-SQL via Dataverse Custom API (no ODBC/TDS driver)
+    - SQL (read-only): query SQL via ?sql parameter in Web API
     - Table metadata: create, inspect, and delete simple custom tables
 
     The client owns authentication (Azure Identity) and configuration, and delegates
@@ -182,21 +182,25 @@ class DataverseClient:
             page_size=page_size,
         )
 
-    # SQL via Custom API
-    def query_sql(self, tsql: str):
-        """Execute a read-only SQL query via the configured Custom API.
+    # SQL via Web API sql parameter
+    def query_sql(self, sql: str):
+        """Execute a read-only SQL query using the Dataverse Web API `?sql=` capability.
+
+        The query must follow the currently supported subset: single SELECT with optional WHERE,
+        TOP (integer), ORDER BY (columns only), and simple alias after FROM. Example:
+            ``SELECT TOP 3 accountid, name FROM account ORDER BY name DESC``
 
         Parameters
         ----------
-        tsql : str
-            A SELECT-only T-SQL statement (e.g., ``"SELECT TOP 3 * FROM account"``).
+        sql : str
+            Supported single SELECT statement.
 
         Returns
         -------
         list[dict]
-            Rows as a list of dictionaries.
+            Result rows (empty list if none).
         """
-        return self._get_odata().query_sql(tsql)
+        return self._get_odata().query_sql(sql)
 
     # Table metadata helpers
     def get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
