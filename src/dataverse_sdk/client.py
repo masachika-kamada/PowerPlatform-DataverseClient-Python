@@ -62,83 +62,66 @@ class DataverseClient:
             self._odata = ODataClient(self.auth, self._base_url, self._config)
         return self._odata
 
-    # CRUD
-    def create(self, entity: str, record_data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[Dict[str, Any], List[str]]:
-        """Create one or more records.
-
-        Behaviour:
-        - Single: returns the created record (dict) using Prefer: return=representation.
-        - Multiple: uses bound CreateMultiple action and returns list[str] of created record IDs.
+    # ---------------- Unified CRUD: create/update/delete ----------------
+    def create(self, entity: str, records: Union[Dict[str, Any], List[Dict[str, Any]]]) -> List[str]:
+        """Create one or many records; always return list[str] of created IDs.
 
         Parameters
         ----------
         entity : str
-            Entity set name (plural logical name), e.g., ``"accounts"``.
-        record_data : dict | list[dict]
-            Single record payload or list of records for multi-create.
+            Entity set name (plural logical name), e.g. "accounts".
+        records : dict | list[dict]
+            A single record dict or a list of record dicts.
 
         Returns
         -------
-        dict | list[str]
-            Dict for single create, list of GUID strings for multi-create.
-
-        Raises
-        ------
-        requests.exceptions.HTTPError
-            If the request fails.
-        TypeError
-            If ``record_data`` is not a dict or list of dict.
+        list[str]
+            List of created GUIDs (length 1 for single input).
         """
-        return self._get_odata().create(entity, record_data)
+        od = self._get_odata()
+        if isinstance(records, dict):
+            rid = od.create(entity, records)  # low-level guarantees GUID str for single
+            if not isinstance(rid, str):
+                raise TypeError("Low-level create did not return GUID string for single record")
+            return [rid]
+        if isinstance(records, list):
+            return od.create(entity, records)  # multi path returns list[str]
+        raise TypeError("records must be dict or list[dict]")
 
-    def update(self, entity: str, record_id: str, record_data: dict) -> dict:
-        """Update a record and return its full representation.
+    def update(self, entity: str, ids: Union[str, List[str]], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
+        """Update one or many records. Returns None.
 
-        Parameters
-        ----------
-        entity : str
-            Entity set name (plural logical name).
-        record_id : str
-            The record GUID (with or without parentheses).
-        record_data : dict
-            Field-value pairs to update.
+        Usage patterns:
+            update("accounts", some_id, {"telephone1": "555"})
+            update("accounts", [id1, id2], {"statecode": 1})            # broadcast
+            update("accounts", [id1, id2], [{"name": "A"}, {"name": "B"}])  # 1:1
 
-        Returns
-        -------
-        dict
-            The updated record payload.
+        Rules:
+        - If ids is a list and changes is a single dict -> broadcast.
+        - If both are lists they must have equal length.
+        - Single update discards representation (performance-focused).
         """
-        return self._get_odata().update(entity, record_id, record_data)
-
-    def update_multiple(self, entity: str, records: List[Dict[str, Any]]) -> None:
-        """Bulk update multiple records via the bound UpdateMultiple action.
-
-        Parameters
-        ----------
-        entity : str
-            Entity set name (plural logical name).
-        records : list[dict]
-            Each record must include the primary key attribute (e.g. ``accountid``) plus fields to update.
-
-        Returns
-        -------
-        None
-            On success returns nothing.
-        """
-        self._get_odata().update_multiple(entity, records)
+        od = self._get_odata()
+        if isinstance(ids, str):
+            if not isinstance(changes, dict):
+                raise TypeError("For single id, changes must be a dict")
+            od.update(entity, ids, changes)  # discard representation
+            return None
+        if not isinstance(ids, list):
+            raise TypeError("ids must be str or list[str]")
+        od.update_by_ids(entity, ids, changes)
         return None
 
-    def delete(self, entity: str, record_id: str) -> None:
-        """Delete a record by ID.
-
-        Parameters
-        ----------
-        entity : str
-            Entity set name (plural logical name).
-        record_id : str
-            The record GUID (with or without parentheses).
-        """
-        self._get_odata().delete(entity, record_id)
+    def delete(self, entity: str, ids: Union[str, List[str]]) -> None:
+        """Delete one or many records (GUIDs). Returns None."""
+        od = self._get_odata()
+        if isinstance(ids, str):
+            od.delete(entity, ids)
+            return None
+        if not isinstance(ids, list):
+            raise TypeError("ids must be str or list[str]")
+        od.delete_many(entity, ids)
+        return None
 
     def get(self, entity: str, record_id: str) -> dict:
         """Fetch a record by ID.
