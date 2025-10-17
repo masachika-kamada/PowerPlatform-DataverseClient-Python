@@ -27,7 +27,6 @@ class ODataClient:
         auth,
         base_url: str,
         config=None,
-        feature_flags: Optional[Dict[str, bool]] = None,
     ) -> None:
         self.auth = auth
         self.base_url = (base_url or "").rstrip("/")
@@ -51,72 +50,6 @@ class ODataClient:
         # Picklist label cache: (logical_name, attribute_logical) -> {'map': {...}, 'ts': epoch_seconds}
         self._picklist_label_cache = {}
         self._picklist_cache_ttl_seconds = 3600  # 1 hour TTL
-        # Load required feature flags from bundled JSON resource; fail hard if missing or invalid.
-        try:
-            data = ir.files("dataverse_sdk").joinpath("feature_flags.json").read_text(encoding="utf-8")
-        except Exception as e:
-            raise RuntimeError(f"Failed to load feature_flags.json resource: {e}") from e
-        try:
-            loaded = json.loads(data) if data else {}
-        except Exception as e:
-            raise RuntimeError(f"feature_flags.json is not valid JSON: {e}") from e
-        if not isinstance(loaded, dict):
-            raise RuntimeError("feature_flags.json root must be a JSON object mapping feature -> (bool | object)")
-
-        self._features: Dict[str, bool] = {}
-        self._feature_metadata: Dict[str, Dict[str, Any]] = {}
-
-        for raw_key, raw_val in loaded.items():
-            # Enforce key type and non-empty constraint
-            if not isinstance(raw_key, str):
-                raise RuntimeError(f"feature_flags.json key '{raw_key}' is not a string")
-            key = raw_key.strip().lower()
-            if not key:
-                raise RuntimeError("feature_flags.json contains an empty feature name")
-            # Object form with strict schema: { "default": bool, "description": str }
-            if isinstance(raw_val, dict):
-                required_keys = {"default", "description"}
-                unknown = set(raw_val.keys()) - required_keys
-                if unknown:
-                    raise RuntimeError(
-                        f"Feature '{raw_key}' has unknown metadata keys: {', '.join(sorted(unknown))}. Allowed: default, description"
-                    )
-                missing = required_keys - set(raw_val.keys())
-                if missing:
-                    raise RuntimeError(
-                        f"Feature '{raw_key}' object missing required key(s): {', '.join(sorted(missing))} (requires: default, description)"
-                    )
-                if not isinstance(raw_val["default"], bool):
-                    raise RuntimeError(f"Feature '{raw_key}' field 'default' must be boolean")
-                desc = raw_val["description"]
-                if not isinstance(desc, str) or not desc.strip():
-                    raise RuntimeError(f"Feature '{raw_key}' field 'description' must be a non-empty string")
-                self._features[key] = raw_val["default"]
-                self._feature_metadata[key] = {"description": desc.strip()}
-                continue
-            # Any other type is invalid
-            raise RuntimeError(
-                f"Feature '{raw_key}' must be an object with 'default' (bool) and required 'description' (non-empty str)"
-            )
-
-        # Overlay user overrides (if supplied). Overrides must:
-        #   - use existing feature names declared in feature_flags.json
-        #   - provide boolean values only (no coercion of truthy/falsy non-bools)
-        #   - use non-empty string keys
-        if isinstance(feature_flags, dict):
-            for k, v in feature_flags.items():
-                if not isinstance(k, str) or not k.strip():
-                    raise ValueError("feature_flags override keys must be non-empty strings")
-                norm = k.strip().lower()
-                if norm not in self._features:
-                    raise ValueError(
-                        f"Unknown feature flag override '{k}' (not declared in feature_flags.json)"
-                    )
-                if not isinstance(v, bool):
-                    raise ValueError(
-                        f"Override value for feature '{k}' must be boolean (got {type(v).__name__})"
-                    )
-                self._features[norm] = v
 
     def _headers(self) -> Dict[str, str]:
         """Build standard OData headers with bearer auth."""
@@ -845,6 +778,10 @@ class ODataClient:
 
         Returns empty dict if attribute is not a picklist or has no options. Returns None only
         for invalid inputs or unexpected metadata parse failures.
+
+        Notes
+        -----
+        - This method calls the Web API twice per attribute so it could have perf impact when there are lots of columns on the entity.
         """
         if not entity_set or not attr_logical:
             return None
@@ -944,9 +881,6 @@ class ODataClient:
         Heuristic: For each string value, attempt to resolve against picklist metadata.
         If attribute isn't a picklist or label not found, value left unchanged.
         """
-        # Fast-path: feature disabled (default). Return original record without copy to avoid overhead.
-        if not self.is_feature_enabled("option_set_label_conversion"):
-            return record
         out = record.copy()
         for k, v in list(out.items()):
             if not isinstance(v, str) or not v.strip():
@@ -1151,20 +1085,3 @@ class ODataClient:
         removed = len(self._picklist_label_cache)
         self._picklist_label_cache.clear()
         return removed
-
-    # ---------------------- Feature flags / toggles --------------------
-    def set_feature(self, name: str, enabled: bool) -> None:
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("Feature name must be a non-empty string")
-        self._features[name.strip().lower()] = bool(enabled)
-
-    def enable_feature(self, name: str) -> None:
-        self.set_feature(name, True)
-
-    def disable_feature(self, name: str) -> None:
-        self.set_feature(name, False)
-
-    def is_feature_enabled(self, name: str) -> bool:
-        if not isinstance(name, str):
-            return False
-        return bool(self._features.get(name.strip().lower()))
