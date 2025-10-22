@@ -152,7 +152,7 @@ class DataverseClient:
                 logical_name,
                 record_id, 
                 select=select,
-                )
+            )
         return od._get_multiple(
             logical_name,
             select=select,
