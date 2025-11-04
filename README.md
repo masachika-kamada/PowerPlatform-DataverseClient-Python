@@ -8,7 +8,7 @@ A Python package allowing developers to connect to Dataverse environments for DD
 - Bulk update — Provide a list of IDs with a single patch (broadcast) or a list of per‑record patches to `update(...)`; internally uses the bound `UpdateMultiple` action; returns nothing. Each record must include the primary key attribute when sent to UpdateMultiple.
 - Retrieve multiple (paging) — Generator-based `get(...)` that yields pages, supports `$top` and Prefer: `odata.maxpagesize` (`page_size`).
 - Upload files — Call `upload_file(logical_name, ...)` and an upload method will be auto picked (you can override the mode). See https://learn.microsoft.com/en-us/power-apps/developer/data-platform/file-column-data?tabs=sdk#upload-files
-- Metadata helpers — Create/inspect/delete simple custom tables (EntityDefinitions + Attributes).
+- Metadata helpers — Create/inspect/delete tables and create/delete columns (EntityDefinitions + Attributes).
 - Pandas helpers — Convenience DataFrame oriented wrappers for quick prototyping/notebooks.
 - Auth — Azure Identity (`TokenCredential`) injection.
 
@@ -16,7 +16,7 @@ A Python package allowing developers to connect to Dataverse environments for DD
 
 - Simple `DataverseClient` facade for CRUD, SQL (read-only), and table metadata.
 - SQL-over-API: Constrained SQL (single SELECT with limited WHERE/TOP/ORDER BY) via native Web API `?sql=` parameter.
-- Table metadata ops: create simple custom tables (supports string/int/decimal/float/datetime/bool/optionset) and delete them.
+- Table metadata ops: create/delete simple custom tables (supports string/int/decimal/float/datetime/bool/optionset) and create/delete columns.
 - Bulk create via `CreateMultiple` (collection-bound) by passing `list[dict]` to `create(logical_name, payloads)`; returns list of created IDs.
 - Bulk update via `UpdateMultiple` (invoked internally) by calling unified `update(logical_name, ids, patch|patches)`; returns nothing.
 - Retrieve multiple with server-driven paging: `get(...)` yields lists (pages) following `@odata.nextLink`. Control total via `$top` and per-page via `page_size` (Prefer: `odata.maxpagesize`).
@@ -42,9 +42,11 @@ Auth:
 | `delete` | `delete(logical_name, list[id])` | `None` | Delete many (sequential). |
 | `query_sql` | `query_sql(sql)` | `list[dict]` | Constrained read-only SELECT via `?sql=`. |
 | `create_table` | `create_table(tablename, schema)` | `dict` | Creates custom table + columns. Friendly name (e.g. `SampleItem`) becomes schema `new_SampleItem`; explicit schema name (contains `_`) used as-is. |
+| `create_column` | `create_column(tablename, columns)` | `list[str]` | Adds columns using a `{name: type}` mapping (same shape as `create_table` schema). Returns schema names for the created columns. |
 | `get_table_info` | `get_table_info(schema_name)` | `dict | None` | Basic table metadata by schema name (e.g. `new_SampleItem`). Friendly names not auto-converted. |
 | `list_tables` | `list_tables()` | `list[dict]` | Lists non-private tables. |
 | `delete_table` | `delete_table(tablename)` | `None` | Drops custom table. Accepts friendly or schema name; friendly converted to `new_<PascalCase>`. |
+| `delete_column` | `delete_column(tablename, columns)` | `list[str]` | Deletes one or more columns; returns schema names (accepts string or list[str]). |
 | `PandasODataClient.create_df` | `create_df(logical_name, series)` | `str` | Create one record (returns GUID). |
 | `PandasODataClient.update` | `update(logical_name, id, series)` | `None` | Returns None; ignored if Series empty. |
 | `PandasODataClient.get_ids` | `get_ids(logical_name, ids, select=None)` | `DataFrame` | One row per ID (errors inline). |
@@ -309,6 +311,10 @@ info = client.create_table(
 		"status": Status,
 	},
 )
+
+# Create or delete columns
+client.create_column("SampleItem", {"category": "string"})  # returns ["new_Category"]
+client.delete_column("SampleItem", "category")  # returns ["new_Category"]
 
 logical = info["entity_logical_name"]  # e.g., "new_sampleitem"
 

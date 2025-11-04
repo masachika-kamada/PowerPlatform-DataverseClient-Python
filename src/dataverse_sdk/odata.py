@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, List, Union, Iterable
+from typing import Any, Dict, Optional, List, Union, Iterable, Tuple
 from enum import Enum
 import unicodedata
 import time
@@ -615,6 +615,11 @@ class ODataClient(ODataFileUpload):
         parts = re.split(r"[^A-Za-z0-9]+", name)
         return "".join(p[:1].upper() + p[1:] for p in parts if p)
 
+    def _normalize_entity_schema(self, tablename: str) -> str:
+        if "_" in tablename:
+            return tablename
+        return f"new_{self._to_pascal(tablename)}"
+
     def _get_entity_by_schema(self, schema_name: str) -> Optional[Dict[str, Any]]:
         url = f"{self.api}/EntityDefinitions"
         # Escape single quotes in schema name
@@ -660,6 +665,51 @@ class ODataClient(ODataFileUpload):
             if ent and ent.get("EntitySetName"):
                 return ent
         return ent
+
+    def _normalize_attribute_schema(self, entity_schema: str, column_name: str) -> str:
+        # Use same publisher prefix segment as entity_schema if present; else default to 'new_'.
+        if not isinstance(column_name, str) or not column_name.strip():
+            raise ValueError("column_name must be a non-empty string")
+        publisher = entity_schema.split("_", 1)[0] if "_" in entity_schema else "new"
+        expected_prefix = f"{publisher}_"
+        if column_name.lower().startswith(expected_prefix.lower()):
+            return column_name
+        return f"{publisher}_{self._to_pascal(column_name)}"
+
+    def _get_attribute_metadata(
+        self,
+        entity_metadata_id: str,
+        schema_name: str,
+        *,
+        extra_select: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        attr_escaped = self._escape_odata_quotes(schema_name)
+        url = f"{self.api}/EntityDefinitions({entity_metadata_id})/Attributes"
+        select_fields = ["MetadataId", "LogicalName", "SchemaName"]
+        if extra_select:
+            for piece in extra_select.split(","):
+                piece = piece.strip()
+                if not piece or piece in select_fields:
+                    continue
+                if piece.startswith("@"):
+                    continue
+                if piece not in select_fields:
+                    select_fields.append(piece)
+        params = {
+            "$select": ",".join(select_fields),
+            "$filter": f"SchemaName eq '{attr_escaped}'",
+        }
+        r = self._request("get", url, params=params)
+        try:
+            body = r.json() if r.text else {}
+        except ValueError:
+            return None
+        items = body.get("value") if isinstance(body, dict) else None
+        if isinstance(items, list) and items:
+            item = items[0]
+            if isinstance(item, dict):
+                return item
+        return None
 
     # ---------------------- Enum / Option Set helpers ------------------
     def _build_localizedlabels_payload(self, translations: Dict[int, str]) -> Dict[str, Any]:
@@ -1026,8 +1076,7 @@ class ODataClient(ODataFileUpload):
         return r.json().get("value", [])
 
     def _delete_table(self, tablename: str) -> None:
-        schema_name = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"
-        entity_schema = schema_name
+        entity_schema = self._normalize_entity_schema(tablename)
         ent = self._get_entity_by_schema(entity_schema)
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
@@ -1041,7 +1090,7 @@ class ODataClient(ODataFileUpload):
     def _create_table(self, tablename: str, schema: Dict[str, Any]) -> Dict[str, Any]:
         # Accept a friendly name and construct a default schema under 'new_'.
         # If a full SchemaName is passed (contains '_'), use as-is.
-        entity_schema = tablename if "_" in tablename else f"new_{self._to_pascal(tablename)}"
+        entity_schema = self._normalize_entity_schema(tablename)
 
         ent = self._get_entity_by_schema(entity_schema)
         if ent:
@@ -1055,12 +1104,7 @@ class ODataClient(ODataFileUpload):
         attributes: List[Dict[str, Any]] = []
         attributes.append(self._attribute_payload(primary_attr_schema, "string", is_primary_name=True))
         for col_name, dtype in schema.items():
-            # Use same publisher prefix segment as entity_schema if present; else default to 'new_'.
-            publisher = entity_schema.split("_", 1)[0] if "_" in entity_schema else "new"
-            if col_name.lower().startswith(f"{publisher}_"):
-                attr_schema = col_name
-            else:
-                attr_schema = f"{publisher}_{self._to_pascal(col_name)}"
+            attr_schema = self._normalize_attribute_schema(entity_schema, col_name)
             payload = self._attribute_payload(attr_schema, dtype)
             if not payload:
                 raise ValueError(f"Unsupported column type '{dtype}' for '{col_name}'.")
@@ -1078,6 +1122,104 @@ class ODataClient(ODataFileUpload):
             "metadata_id": metadata_id,
             "columns_created": created_cols,
         }
+
+    def _create_columns(
+        self,
+        tablename: str,
+        columns: Dict[str, Any],
+    ) -> List[str]:
+        if not isinstance(columns, dict) or not columns:
+            raise TypeError("columns must be a non-empty dict[name -> type]")
+        entity_schema = self._normalize_entity_schema(tablename)
+        ent = self._get_entity_by_schema(entity_schema)
+        if not ent or not ent.get("MetadataId"):
+            raise MetadataError(
+                f"Table '{entity_schema}' not found.",
+                subcode=ec.METADATA_TABLE_NOT_FOUND,
+            )
+
+        metadata_id = ent.get("MetadataId")
+        created: List[str] = []
+        needs_picklist_flush = False
+
+        for column_name, column_type in columns.items():
+            schema_name = self._normalize_attribute_schema(entity_schema, column_name)
+            payload = self._attribute_payload(schema_name, column_type)
+            if not payload:
+                raise ValueError(f"Unsupported column type '{column_type}' for '{schema_name}'.")
+
+            url = f"{self.api}/EntityDefinitions({metadata_id})/Attributes"
+            self._request("post", url, json=payload)
+
+            created.append(schema_name)
+
+            if "OptionSet" in payload:
+                needs_picklist_flush = True
+
+        if needs_picklist_flush:
+            self._flush_cache("picklist")
+
+        return created
+
+    def _delete_columns(
+        self,
+        tablename: str,
+        columns: Union[str, List[str]],
+    ) -> List[str]:
+        if isinstance(columns, str):
+            names = [columns]
+        elif isinstance(columns, list):
+            names = columns
+        else:
+            raise TypeError("columns must be str or list[str]")
+
+        for name in names:
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("column names must be non-empty strings")
+
+        entity_schema = self._normalize_entity_schema(tablename)
+        ent = self._get_entity_by_schema(entity_schema)
+        if not ent or not ent.get("MetadataId"):
+            raise MetadataError(
+                f"Table '{entity_schema}' not found.",
+                subcode=ec.METADATA_TABLE_NOT_FOUND,
+            )
+
+        metadata_id = ent.get("MetadataId")
+        deleted: List[str] = []
+        needs_picklist_flush = False
+
+        for column_name in names:
+            schema_name = self._normalize_attribute_schema(entity_schema, column_name)
+            attr_meta = self._get_attribute_metadata(metadata_id, schema_name, extra_select="@odata.type,AttributeType")
+            if not attr_meta:
+                raise MetadataError(
+                    f"Column '{schema_name}' not found on table '{entity_schema}'.",
+                    subcode=ec.METADATA_COLUMN_NOT_FOUND,
+                )
+
+            attr_metadata_id = attr_meta.get("MetadataId")
+            if not attr_metadata_id:
+                raise RuntimeError(
+                    f"Metadata incomplete for column '{schema_name}' (missing MetadataId)."
+                )
+
+            attr_url = f"{self.api}/EntityDefinitions({metadata_id})/Attributes({attr_metadata_id})"
+            self._request("delete", attr_url, headers={"If-Match": "*"})
+
+            attr_type = attr_meta.get("@odata.type") or attr_meta.get("AttributeType")
+            if isinstance(attr_type, str):
+                attr_type_l = attr_type.lower()
+                if "picklist" in attr_type_l or "optionset" in attr_type_l:
+                    needs_picklist_flush = True
+
+            deleted.append(schema_name)
+
+        if needs_picklist_flush:
+            self._flush_cache("picklist")
+
+        return deleted
+    
     # ---------------------- Cache maintenance -------------------------
     def _flush_cache(
         self,

@@ -7,6 +7,7 @@ from typing import Optional
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from dataverse_sdk import DataverseClient
+from dataverse_sdk.errors import MetadataError
 from enum import IntEnum
 from azure.identity import InteractiveBrowserCredential
 import traceback
@@ -64,7 +65,7 @@ def backoff_retry(op, *, delays=(0, 2, 5, 10, 20), retry_http_statuses=(400, 403
 			break
 	if last_exc:
 		raise last_exc
-
+	
 # Enum demonstrating local option set creation with multilingual labels (for French labels to work, enable French language in the environment first)
 class Status(IntEnum):
 	Active = 1
@@ -141,7 +142,94 @@ else:
 				pass
 		# Fail fast: all operations must use the custom table
 		sys.exit(1)
+entity_schema = table_info.get("entity_schema") or "new_SampleItem"
 logical = table_info.get("entity_logical_name")
+metadata_id = table_info.get("metadata_id")
+if not metadata_id:
+	refreshed_info = client.get_table_info(entity_schema) or {}
+	metadata_id = refreshed_info.get("metadata_id")
+	if metadata_id:
+		table_info["metadata_id"] = metadata_id
+
+# 6) Column metadata helpers: column create/delete
+print("Column metadata helpers (create/delete column):")
+scratch_column = f"scratch_{int(time.time())}"
+column_payload = {scratch_column: "string"}
+try:
+	log_call(f"client.create_column('{entity_schema}', {repr(column_payload)})")
+	column_create = client.create_columns(entity_schema, column_payload)
+	if not isinstance(column_create, list) or not column_create:
+		raise RuntimeError("create_column did not return schema list")
+	created_details = column_create
+	if not all(isinstance(item, str) for item in created_details):
+		raise RuntimeError("create_column entries were not schema strings")
+	attribute_schema = created_details[0]
+	odata_client = client._get_odata()
+	exists_after_create = None
+	exists_after_delete = None
+	attr_type_before = None
+	attr_type_before_norm = None
+	if metadata_id and attribute_schema:
+		_ready_message = "Column metadata not yet available"
+		def _metadata_after_create():
+			meta = odata_client._get_attribute_metadata(
+				metadata_id,
+				attribute_schema,
+				extra_select="@odata.type,AttributeType",
+			)
+			if not meta or not meta.get("MetadataId"):
+				raise RuntimeError(_ready_message)
+			return meta
+
+		ready_meta = backoff_retry(
+			_metadata_after_create,
+			delays=(0, 1, 2, 4, 8),
+			retry_http_statuses=(),
+			retry_if=lambda exc: isinstance(exc, RuntimeError) and str(exc) == _ready_message,
+		)
+		exists_after_create = bool(ready_meta)
+		raw_type = ready_meta.get("@odata.type") or ready_meta.get("AttributeType")
+		if isinstance(raw_type, str):
+			attr_type_before = raw_type
+			lowered = raw_type.lower()
+			attr_type_before_norm = lowered.rsplit(".", 1)[-1] if "." in lowered else lowered
+	log_call(f"client.delete_column('{entity_schema}', '{scratch_column}')")
+	column_delete = client.delete_columns(entity_schema, scratch_column)
+	if not isinstance(column_delete, list) or not column_delete:
+		raise RuntimeError("delete_column did not return schema list")
+	deleted_details = column_delete
+	if not all(isinstance(item, str) for item in deleted_details):
+		raise RuntimeError("delete_column entries were not schema strings")
+	if attribute_schema not in deleted_details:
+		raise RuntimeError("delete_columns response missing expected schema name")
+	if metadata_id and attribute_schema:
+		_delete_message = "Column metadata still present after delete"
+		def _ensure_removed():
+			meta = odata_client._get_attribute_metadata(metadata_id, attribute_schema)
+			if meta:
+				raise RuntimeError(_delete_message)
+			return True
+
+		removed = backoff_retry(
+			_ensure_removed,
+			delays=(0, 1, 2, 4, 8),
+			retry_http_statuses=(),
+			retry_if=lambda exc: isinstance(exc, RuntimeError) and str(exc) == _delete_message,
+		)
+		exists_after_delete = not removed
+	print({
+		"created_column": scratch_column,
+		"create_summary": created_details,
+		"delete_summary": deleted_details,
+		"attribute_type_before_delete": attr_type_before,
+		"exists_after_create": exists_after_create,
+		"exists_after_delete": exists_after_delete,
+	})
+except MetadataError as meta_err:
+	print({"column_metadata_error": str(meta_err)})
+except Exception as exc:
+	print({"column_metadata_unexpected": str(exc)})
+sys.exit(0)
 
 # Derive attribute logical name prefix from the entity logical name (segment before first underscore)
 attr_prefix = logical.split("_", 1)[0] if "_" in logical else logical
@@ -527,9 +615,90 @@ try:
 except Exception as e:
 	print(f"Delete failed: {e}")
 
+pause("Next: column metadata helpers")
+
+# 6) Column metadata helpers: column create/delete
+print("Column metadata helpers (create/delete column):")
+scratch_column = f"scratch_{int(time.time())}"
+column_payload = {scratch_column: "string"}
+try:
+	log_call(f"client.create_column('{entity_schema}', {repr(column_payload)})")
+	column_create = client.create_columns(entity_schema, column_payload)
+	if not isinstance(column_create, list) or not column_create:
+		raise RuntimeError("create_column did not return schema list")
+	created_details = column_create
+	if not all(isinstance(item, str) for item in created_details):
+		raise RuntimeError("create_column entries were not schema strings")
+	attribute_schema = created_details[0]
+	odata_client = client._get_odata()
+	exists_after_create = None
+	exists_after_delete = None
+	attr_type_before = None
+	attr_type_before_norm = None
+	if metadata_id and attribute_schema:
+		_ready_message = "Column metadata not yet available"
+		def _metadata_after_create():
+			meta = odata_client._get_attribute_metadata(
+				metadata_id,
+				attribute_schema,
+				extra_select="@odata.type,AttributeType",
+			)
+			if not meta or not meta.get("MetadataId"):
+				raise RuntimeError(_ready_message)
+			return meta
+
+		ready_meta = backoff_retry(
+			_metadata_after_create,
+			delays=(0, 1, 2, 4, 8),
+			retry_http_statuses=(),
+			retry_if=lambda exc: isinstance(exc, RuntimeError) and str(exc) == _ready_message,
+		)
+		exists_after_create = bool(ready_meta)
+		raw_type = ready_meta.get("@odata.type") or ready_meta.get("AttributeType")
+		if isinstance(raw_type, str):
+			attr_type_before = raw_type
+			lowered = raw_type.lower()
+			attr_type_before_norm = lowered.rsplit(".", 1)[-1] if "." in lowered else lowered
+	log_call(f"client.delete_column('{entity_schema}', '{scratch_column}')")
+	column_delete = client.delete_columns(entity_schema, scratch_column)
+	if not isinstance(column_delete, list) or not column_delete:
+		raise RuntimeError("delete_column did not return schema list")
+	deleted_details = column_delete
+	if not all(isinstance(item, str) for item in deleted_details):
+		raise RuntimeError("delete_column entries were not schema strings")
+	if attribute_schema not in deleted_details:
+		raise RuntimeError("delete_column response missing expected schema name")
+	if metadata_id and attribute_schema:
+		_delete_message = "Column metadata still present after delete"
+		def _ensure_removed():
+			meta = odata_client._get_attribute_metadata(metadata_id, attribute_schema)
+			if meta:
+				raise RuntimeError(_delete_message)
+			return True
+
+		removed = backoff_retry(
+			_ensure_removed,
+			delays=(0, 1, 2, 4, 8),
+			retry_http_statuses=(),
+			retry_if=lambda exc: isinstance(exc, RuntimeError) and str(exc) == _delete_message,
+		)
+		exists_after_delete = not removed
+	print({
+		"created_column": scratch_column,
+		"create_summary": created_details,
+		"delete_summary": deleted_details,
+		"attribute_type_before_delete": attr_type_before,
+		"exists_after_create": exists_after_create,
+		"exists_after_delete": exists_after_delete,
+	})
+except MetadataError as meta_err:
+	print({"column_metadata_error": str(meta_err)})
+except Exception as exc:
+	print({"column_metadata_unexpected": str(exc)})
+
 pause("Next: Cleanup table")
 
-# 6) Cleanup: delete the custom table if it exists
+# 7) Cleanup: delete the custom table if it exists
 print("Cleanup (Metadata):")
 if delete_table_at_end:
 	try:
