@@ -463,6 +463,68 @@ class DataverseClient:
                     print(table)
         """
         return self._get_odata()._list_tables()
+    
+    def create_columns(
+        self,
+        tablename: str,
+        columns: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Create one or more columns on an existing table using a schema-style mapping.
+
+        :param tablename: Friendly name ("SampleItem") or full schema name ("new_SampleItem").
+        :type tablename: str
+        :param columns: Mapping of logical names (without prefix) to supported types. Primitive types include
+            ``string``, ``int``, ``decimal``, ``float``, ``datetime``, and ``bool``. Enum subclasses (IntEnum preferred)
+            generate a local option set and can specify localized labels via ``__labels__``.
+        :type columns: Dict[str, Any]
+        :returns: Schema names for the columns that were created.
+        :rtype: list[str]
+        Example:
+            Create two columns on the custom table::
+
+                created = client.create_columns(
+                    "new_SampleItem",
+                    {
+                        "scratch": "string",
+                        "flags": "bool",
+                    },
+                )
+                print(created)
+        """
+        return self._get_odata()._create_columns(
+            tablename,
+            columns,
+        )
+
+    def delete_columns(
+        self,
+        tablename: str,
+        columns: Union[str, List[str]],
+    ) -> List[str]:
+        """
+        Delete one or more columns from a table.
+
+        :param tablename: Friendly or schema name of the table.
+        :type tablename: str
+        :param columns: Column name or list of column names to remove. Friendly names are normalized to schema
+            names using the same prefix logic as ``create_columns``.
+        :type columns: str | list[str]
+        :returns: Schema names for the columns that were removed.
+        :rtype: list[str]
+        Example:
+            Remove two custom columns by schema name:
+
+                removed = client.delete_columns(
+                    "new_SampleItem",
+                    ["new_Scratch", "new_Flags"],
+                )
+                print(removed)
+        """
+        return self._get_odata()._delete_columns(
+            tablename,
+            columns,
+        )
 
     # File upload
     def upload_file(

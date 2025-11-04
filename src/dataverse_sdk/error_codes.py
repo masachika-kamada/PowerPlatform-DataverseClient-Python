@@ -43,6 +43,7 @@ METADATA_ENTITYSET_NOT_FOUND = "metadata_entityset_not_found"
 METADATA_ENTITYSET_NAME_MISSING = "metadata_entityset_name_missing"
 METADATA_TABLE_NOT_FOUND = "metadata_table_not_found"
 METADATA_TABLE_ALREADY_EXISTS = "metadata_table_already_exists"
+METADATA_COLUMN_NOT_FOUND = "metadata_column_not_found"
 METADATA_ATTRIBUTE_RETRY_EXHAUSTED = "metadata_attribute_retry_exhausted"
 METADATA_PICKLIST_RETRY_EXHAUSTED = "metadata_picklist_retry_exhausted"
 
