@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 """File upload helpers separated from core OData client.
 
 Provide a mixin class `ODataFileUploadMixin` so these methods can be reused without

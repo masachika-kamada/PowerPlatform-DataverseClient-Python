@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 # HTTP subcode constants
 HTTP_400 = "http_400"
 HTTP_401 = "http_401"

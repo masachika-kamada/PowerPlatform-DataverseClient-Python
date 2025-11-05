@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
 import types
 import pytest
 from dataverse_sdk.odata import ODataClient
