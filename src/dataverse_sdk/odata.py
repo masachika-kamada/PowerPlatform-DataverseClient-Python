@@ -291,10 +291,6 @@ class ODataClient(ODataFileUpload):
 
         Returns the asynchronous job identifier reported by the BulkDelete action.
         """
-        if not isinstance(ids, list):
-            raise TypeError("ids must be list[str]")
-        if not all(isinstance(rid, str) for rid in ids):
-            raise TypeError("each id must be a string GUID")
         targets = [rid for rid in ids if rid]
         if not targets:
             return None
