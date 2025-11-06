@@ -73,21 +73,16 @@ Direct TDS via ODBC is not used; SQL reads are executed via the Web API using th
 ## Configuration Notes
 
 - For Web API (OData), tokens target your Dataverse org URL scope: https://yourorg.crm.dynamics.com/.default. The SDK requests this scope from the provided TokenCredential.
-	(Preprod environments may surface newest SQL subset capabilities sooner than production.)
 
-### Configuration (DataverseConfig)
-
-Pass a `DataverseConfig` or rely on sane defaults:
+### Configuration
 
 ```python
+from azure.identity import InteractiveBrowserCredential
 from dataverse_sdk import DataverseClient
-from dataverse_sdk.config import DataverseConfig
 
-cfg = DataverseConfig()  # defaults: language_code=1033
-client = DataverseClient(base_url="https://yourorg.crm.dynamics.com", config=cfg)
-
-# Optional HTTP tunables (timeouts/retries)
-# cfg.http_retries, cfg.http_backoff, cfg.http_timeout
+base_url = "https://yourorg.crm.dynamics.com"
+credential = InteractiveBrowserCredential()  # or DeviceCodeCredential(), ClientSecretCredential(...), etc.
+client = DataverseClient(base_url=base_url, credential=credential)
 ```
 
 ## Quickstart
