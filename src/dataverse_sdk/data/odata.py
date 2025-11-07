@@ -12,10 +12,10 @@ import json
 from datetime import datetime, timezone
 import importlib.resources as ir
 
-from .http import HttpClient
-from .odata_upload_files import ODataFileUpload
-from .errors import *
-from . import error_codes as ec
+from ..core.http import HttpClient
+from .upload import ODataFileUpload
+from ..core.errors import *
+from ..core import error_codes as ec
 
 
 _GUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
@@ -40,7 +40,7 @@ class ODataClient(ODataFileUpload):
         if not self.base_url:
             raise ValueError("base_url is required.")
         self.api = f"{self.base_url}/api/data/v9.2"
-        self.config = config or __import__("dataverse_sdk.config", fromlist=["DataverseConfig"]).DataverseConfig.from_env()
+        self.config = config or __import__("dataverse_sdk.core.config", fromlist=["DataverseConfig"]).DataverseConfig.from_env()
         self._http = HttpClient(
             retries=self.config.http_retries,
             backoff=self.config.http_backoff,
