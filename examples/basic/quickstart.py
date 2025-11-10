@@ -1,16 +1,28 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+"""
+PowerPlatform Dataverse Client - Basic Quickstart Example
+
+This example demonstrates basic usage of the PowerPlatform-Dataverse-Client SDK.
+
+Prerequisites:
+    pip install PowerPlatform-Dataverse-Client
+    pip install azure-identity
+
+For local development, you can also run from source by uncommenting the sys.path line below.
+"""
+
 import sys
 from pathlib import Path
 import os
 from typing import Optional
 
-# Add src to PYTHONPATH for local runs
-sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
+# Uncomment for local development from source
+# sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
-from dataverse_sdk import DataverseClient
-from dataverse_sdk.core.errors import MetadataError
+from PowerPlatform.Dataverse import DataverseClient
+from PowerPlatform.Dataverse.core.errors import MetadataError
 from enum import IntEnum
 from azure.identity import InteractiveBrowserCredential
 import traceback

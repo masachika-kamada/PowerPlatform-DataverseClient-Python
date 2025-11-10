@@ -45,7 +45,7 @@ class DataverseClient:
         Create a client and perform basic operations::
 
             from azure.identity import DefaultAzureCredential
-            from dataverse_sdk import DataverseClient
+            from PowerPlatform.Dataverse import DataverseClient
 
             credential = DefaultAzureCredential()
             client = DataverseClient(

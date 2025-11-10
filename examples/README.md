@@ -1,6 +1,14 @@
-# Dataverse SDK Examples
+# PowerPlatform Dataverse Client Examples
 
-This directory contains comprehensive examples demonstrating how to use the Microsoft Dataverse SDK for Python.
+This directory contains comprehensive examples demonstrating how to use the **PowerPlatform-Dataverse-Client** SDK for Python.
+
+## 📦 Installation
+
+Install the PowerPlatform Dataverse Client SDK:
+
+```bash
+pip install PowerPlatform-Dataverse-Client
+```
 
 ## 📁 Directory Structure
 
@@ -18,9 +26,14 @@ Explore powerful features for complex scenarios:
 
 ## 🚀 Getting Started
 
-1. **Install Dependencies**:
+1. **Install the SDK**:
    ```bash
-   pip install -r requirements.txt
+   pip install PowerPlatform-Dataverse-Client
+   ```
+
+2. **Install Additional Dependencies** (for examples):
+   ```bash
+   pip install azure-identity pandas
    ```
 
 2. **Set Up Authentication**:
@@ -33,10 +46,10 @@ Explore powerful features for complex scenarios:
 
 ## 📋 Prerequisites
 
-- Python 3.8+
+- Python 3.10+
+- PowerPlatform-Dataverse-Client SDK installed (`pip install PowerPlatform-Dataverse-Client`)
 - Azure Identity credentials configured
 - Access to a Dataverse environment
-- Required packages installed from `requirements.txt`
 
 ## 🔒 Authentication
 

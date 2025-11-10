@@ -80,7 +80,7 @@ Direct TDS via ODBC is not used; SQL reads are executed via the Web API using th
 
 ```python
 from azure.identity import InteractiveBrowserCredential
-from dataverse_sdk import DataverseClient
+from PowerPlatform.Dataverse import DataverseClient
 
 base_url = "https://yourorg.crm.dynamics.com"
 credential = InteractiveBrowserCredential()  # or DeviceCodeCredential(), ClientSecretCredential(...), etc.
@@ -111,7 +111,7 @@ For upload files functionalities, run quickstart_file_upload.py instead
 
 ```python
 from azure.identity import InteractiveBrowserCredential
-from dataverse_sdk import DataverseClient
+from PowerPlatform.Dataverse import DataverseClient
 
 base_url = "https://yourorg.crm.dynamics.com"
 credential = InteractiveBrowserCredential()  # or DeviceCodeCredential(), ClientSecretCredential(...), etc.
