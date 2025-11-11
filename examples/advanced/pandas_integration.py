@@ -1,15 +1,29 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+"""
+PowerPlatform Dataverse Client - Pandas Integration Example
+
+This example demonstrates advanced DataFrame-based operations using the 
+PowerPlatform-Dataverse-Client SDK with pandas integration.
+
+Prerequisites:
+    pip install PowerPlatform-Dataverse-Client
+    pip install azure-identity
+    pip install pandas
+
+For local development, you can also run from source by uncommenting the sys.path line below.
+"""
+
 import sys
 from pathlib import Path
 import os
 
-# Add src to PYTHONPATH for local runs
-sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
+# Uncomment for local development from source
+# sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
-from dataverse_sdk import DataverseClient
-from dataverse_sdk.utils.pandas_adapter import PandasODataClient
+from PowerPlatform.Dataverse import DataverseClient
+from PowerPlatform.Dataverse.utils.pandas_adapter import PandasODataClient
 from azure.identity import InteractiveBrowserCredential
 import traceback
 import requests

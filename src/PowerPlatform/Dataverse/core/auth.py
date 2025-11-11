@@ -45,7 +45,7 @@ class AuthManager:
         :param scope: OAuth2 scope string, typically ``"https://<org>.crm.dynamics.com/.default"``.
         :type scope: str
         :return: Token pair containing the scope and access token.
-        :rtype: ~dataverse_sdk.auth.TokenPair
+        :rtype: ~PowerPlatform.Dataverse.core.auth.TokenPair
         :raises ~azure.core.exceptions.ClientAuthenticationError: If token acquisition fails.
         """
         token = self.credential.get_token(scope)

@@ -39,7 +39,7 @@ class PandasODataClient:
     High-level pandas-friendly wrapper for Dataverse OData operations.
 
     :param odata_client: Initialized low-level OData client with authentication configured.
-    :type odata_client: ~dataverse_sdk.odata.ODataClient
+    :type odata_client: ~PowerPlatform.Dataverse.data.odata.ODataClient
     """
 
     def __init__(self, odata_client: ODataClient) -> None:

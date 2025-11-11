@@ -3,8 +3,8 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dataverse-client-python"
-version = "0.1.0"
+name = "PowerPlatform-Dataverse-Client"
+version = "0.1.0b1"
 description = "Python SDK for Microsoft Dataverse"
 readme = {file = "README.md", content-type = "text/markdown"}
 authors = [{name = "Microsoft Corporation"}]
@@ -30,3 +30,9 @@ dependencies = [
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["PowerPlatform*"]
+namespaces = false
