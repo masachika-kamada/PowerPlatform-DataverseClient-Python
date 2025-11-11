@@ -34,7 +34,7 @@ class DataverseConfig:
         Create a configuration instance with default settings.
 
         :return: Configuration instance with default values.
-        :rtype: ~dataverse_sdk.config.DataverseConfig
+        :rtype: ~PowerPlatform.Dataverse.core.config.DataverseConfig
         """
         # Environment-free defaults
         return cls(

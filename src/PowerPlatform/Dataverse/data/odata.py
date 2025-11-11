@@ -43,7 +43,7 @@ class ODataClient(ODataFileUpload):
         if not self.base_url:
             raise ValueError("base_url is required.")
         self.api = f"{self.base_url}/api/data/v9.2"
-        self.config = config or __import__("dataverse_sdk.core.config", fromlist=["DataverseConfig"]).DataverseConfig.from_env()
+        self.config = config or __import__("PowerPlatform.Dataverse.core.config", fromlist=["DataverseConfig"]).DataverseConfig.from_env()
         self._http = HttpClient(
             retries=self.config.http_retries,
             backoff=self.config.http_backoff,

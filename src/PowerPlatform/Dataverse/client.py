@@ -18,7 +18,7 @@ class DataverseClient:
 
     This client provides a simple, stable interface for interacting with Dataverse environments
     through the Web API. It handles authentication via Azure Identity and delegates HTTP operations
-    to an internal :class:`~dataverse_sdk.odata.ODataClient`.
+    to an internal :class:`~PowerPlatform.Dataverse.data.odata.ODataClient`.
 
     Key capabilities:
         - OData CRUD operations: create, read, update, delete records
@@ -32,8 +32,8 @@ class DataverseClient:
     :param credential: Azure Identity credential for authentication.
     :type credential: ~azure.core.credentials.TokenCredential
     :param config: Optional configuration for language, timeouts, and retries.
-        If not provided, defaults are loaded from :meth:`~dataverse_sdk.config.DataverseConfig.from_env`.
-    :type config: ~dataverse_sdk.config.DataverseConfig or None
+        If not provided, defaults are loaded from :meth:`~PowerPlatform.Dataverse.core.config.DataverseConfig.from_env`.
+    :type config: ~PowerPlatform.Dataverse.core.config.DataverseConfig or None
 
     :raises ValueError: If ``base_url`` is missing or empty after trimming.
 
@@ -90,7 +90,7 @@ class DataverseClient:
         deferring construction until the first API call.
 
         :return: The lazily-initialized low-level client used to perform HTTP requests.
-        :rtype: ~dataverse_sdk.odata.ODataClient
+        :rtype: ~PowerPlatform.Dataverse.data.odata.ODataClient
         """
         if self._odata is None:
             self._odata = ODataClient(
@@ -348,8 +348,8 @@ class DataverseClient:
         :return: List of result row dictionaries. Returns an empty list if no rows match.
         :rtype: list[dict]
 
-        :raises ~dataverse_sdk.errors.SQLParseError: If the SQL query uses unsupported syntax.
-        :raises ~dataverse_sdk.errors.HttpError: If the Web API returns an error.
+        :raises ~PowerPlatform.Dataverse.core.errors.SQLParseError: If the SQL query uses unsupported syntax.
+        :raises ~PowerPlatform.Dataverse.core.errors.HttpError: If the Web API returns an error.
 
         .. note::
             The SQL support is limited to read-only queries. Complex joins, subqueries,
@@ -432,7 +432,7 @@ class DataverseClient:
             ``entity_set_name``, ``entity_logical_name``, ``metadata_id``, and ``columns_created``.
         :rtype: dict
 
-        :raises ~dataverse_sdk.errors.MetadataError: If table creation fails or the schema is invalid.
+        :raises ~PowerPlatform.Dataverse.core.errors.MetadataError: If table creation fails or the schema is invalid.
 
         Example:
             Create a table with simple columns::
@@ -469,7 +469,7 @@ class DataverseClient:
             (e.g. ``"new_SampleItem"``).
         :type tablename: str
 
-        :raises ~dataverse_sdk.errors.MetadataError: If the table does not exist or deletion fails.
+        :raises ~PowerPlatform.Dataverse.core.errors.MetadataError: If the table does not exist or deletion fails.
 
         .. warning::
             This operation is irreversible and will delete all records in the table along
@@ -594,7 +594,7 @@ class DataverseClient:
             ``If-Match: *``. Used for small and chunk modes only.
         :type if_none_match: bool
 
-        :raises ~dataverse_sdk.errors.HttpError: If the upload fails or the file column is not empty
+        :raises ~PowerPlatform.Dataverse.core.errors.HttpError: If the upload fails or the file column is not empty
             when ``if_none_match=True``.
         :raises FileNotFoundError: If the specified file path does not exist.
 
