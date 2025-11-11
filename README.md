@@ -36,10 +36,9 @@ A Python client library for Microsoft Dataverse that provides a unified interfac
 - **📊 SQL Queries**: Execute read-only SQL queries via the Dataverse Web API `?sql=` parameter  
 - **🏗️ Table Management**: Create, inspect, and delete custom tables and columns programmatically
 - **📎 File Operations**: Upload files to Dataverse file columns with automatic chunking for large files
-- **🐼 Pandas Integration**: DataFrame-oriented operations for seamless data analysis workflows
 - **🔐 Azure Identity**: Built-in authentication using Azure Identity credential providers with comprehensive support
-- **⚡ Performance Optimized**: Intelligent caching, connection pooling, and batch operations for production workloads
 - **🛡️ Error Handling**: Structured exception hierarchy with detailed error context and retry guidance
+- **🐼 Pandas Integration**: Preliminary DataFrame-oriented operations for data analysis workflows
 
 ## Getting started
 
