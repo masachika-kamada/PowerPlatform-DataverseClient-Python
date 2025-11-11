@@ -12,7 +12,8 @@ This comprehensive example demonstrates:
 
 ## Installation
 
-1. Install the SDK:
+### For End Users (Production/Consumption):
+1. Install the published SDK from PyPI:
    ```bash
    pip install PowerPlatform-Dataverse-Client
    ```
@@ -21,6 +22,23 @@ This comprehensive example demonstrates:
    ```bash
    pip install azure-identity
    ```
+
+### For Developers (Contributing/Local Development):
+1. Clone the repository and navigate to the project directory
+2. Install in editable/development mode:
+   ```bash
+   pip install -e .
+   ```
+
+**Key Differences:**
+- `pip install PowerPlatform-Dataverse-Client` → Downloads and installs the published package from PyPI
+- `pip install -e .` → Installs from local source code in "editable" mode
+
+**Editable Mode Benefits:**
+- ✅ Changes to source code are immediately available (no reinstall needed)
+- ✅ Perfect for development, testing, and contributing
+- ✅ Examples and tests can access the local codebase
+- ✅ Supports debugging and live code modifications
 
 ## What This Script Does
 
@@ -76,9 +94,19 @@ def validate_imports():
     except ImportError as e:
         print(f"  ❌ Import failed: {e}")
         print("\n💡 Troubleshooting:")
-        print("  • Install with: pip install PowerPlatform-Dataverse-Client")
-        print("  • Install Azure Identity: pip install azure-identity")
-        print("  • Check virtual environment is activated")
+        print("  📦 For end users (published package):")
+        print("    • pip install PowerPlatform-Dataverse-Client")
+        print("    • pip install azure-identity")
+        print("  ")
+        print("  🛠️  For developers (local development):")
+        print("    • Navigate to the project root directory")
+        print("    • pip install -e .")
+        print("    • This enables 'editable mode' for live development")
+        print("  ")
+        print("  🔧 General fixes:")
+        print("    • Check virtual environment is activated")
+        print("    • Verify you're in the correct directory")
+        print("    • Try: pip list | grep PowerPlatform")
         return False, None, None
 
 
