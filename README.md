@@ -22,7 +22,7 @@ A Python client library for Microsoft Dataverse that provides a unified interfac
 - [Examples](#examples)
   - [Quick start](#quick-start)
   - [Basic CRUD operations](#basic-crud-operations)
-  - [Bulk operations](#bulk-operations)
+  - [Batch operations](#batch-operations)
   - [Query data](#query-data)
   - [Table management](#table-management)
   - [File operations](#file-operations)
@@ -32,7 +32,7 @@ A Python client library for Microsoft Dataverse that provides a unified interfac
 
 ## Key features
 
-- **🔄 CRUD Operations**: Create, read, update, and delete records with support for bulk operations and automatic retry
+- **🔄 CRUD Operations**: Create, read, update, and delete records with support for batch operations and automatic retry
 - **📊 SQL Queries**: Execute read-only SQL queries via the Dataverse Web API `?sql=` parameter  
 - **🏗️ Table Management**: Create, inspect, and delete custom tables and columns programmatically
 - **📎 File Operations**: Upload files to Dataverse file columns with automatic chunking for large files
@@ -145,10 +145,10 @@ client.update("account", account_id, {"telephone1": "555-0199"})
 client.delete("account", account_id)
 ```
 
-### Bulk operations
+### Batch operations
 
 ```python
-# Bulk create
+# Batch create
 payloads = [
     {"name": "Company A"},
     {"name": "Company B"},
@@ -156,10 +156,10 @@ payloads = [
 ]
 ids = client.create("account", payloads)
 
-# Bulk update (broadcast same change to all)
+# Batch update (broadcast same change to all)
 client.update("account", ids, {"industry": "Technology"})
 
-# Bulk delete
+# Batch delete
 client.delete("account", ids, use_bulk_delete=True)
 ```
 
