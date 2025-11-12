@@ -59,8 +59,8 @@ class HttpClient:
         :rtype: requests.Response
         :raises requests.exceptions.RequestException: If all retry attempts fail.
         """
-        # Apply per-method default timeouts if not provided
-        # Apply default timeout if not provided; fall back to per-method defaults
+        # If no timeout is provided, use the user-specified default timeout if set;
+        # otherwise, apply per-method defaults (120s for POST/DELETE, 10s for others).
         if "timeout" not in kwargs:
             if self.default_timeout is not None:
                 kwargs["timeout"] = self.default_timeout
