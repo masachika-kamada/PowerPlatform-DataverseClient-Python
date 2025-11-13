@@ -104,6 +104,7 @@ The SDK provides a simple, pythonic interface for Dataverse operations:
 | **Bulk Operations** | Efficient bulk processing for multiple records with automatic optimization |
 | **Paging** | Automatic handling of large result sets with iterators |
 | **Structured Errors** | Detailed exception hierarchy with retry guidance and diagnostic information |
+| **Publisher Prefixes** | Custom columns require publisher prefix (e.g., `"new_Title"` not `"Title"`) |
 
 ## Examples
 
@@ -189,19 +190,22 @@ for page in pages:
 ### Table management
 
 ```python
-# Create a custom table
-table_info = client.create_table("Product", {
-    "code": "string",
-    "price": "decimal", 
-    "active": "bool"
+# Create a custom table with publisher-prefixed columns
+table_info = client.create_table("new_Product", {
+    "new_Code": "string",
+    "new_Price": "decimal", 
+    "new_Active": "bool"
 })
 
-# Add columns to existing table
-client.create_columns("Product", {"category": "string"})
+# Add columns to existing table (columns must include publisher prefix)
+client.create_columns("new_Product", {"new_Category": "string"})
 
 # Clean up
-client.delete_table("Product")
+client.delete_table("new_Product")
 ```
+
+> **Important**: All custom column names must include the publisher prefix (e.g., `"new_"`). 
+> This ensures explicit, predictable naming and aligns with Dataverse metadata requirements.
 
 ### File operations
 

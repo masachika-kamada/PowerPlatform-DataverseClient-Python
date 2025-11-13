@@ -69,7 +69,7 @@ table_info = None
 created_this_run = False
 
 # First check for existing table
-existing = client.get_table_info("SampleItem")
+existing = client.get_table_info("new_SampleItem")
 if existing:
 	table_info = existing
 	created_this_run = False
@@ -85,13 +85,13 @@ else:
 	# Create it since it doesn't exist
 	try:
 		table_info = client.create_table(
-			"SampleItem",
+			"new_SampleItem",
 			{
-				"code": "string",
-				"count": "int",
-				"amount": "decimal",
-				"when": "datetime",
-				"active": "bool",
+				"new_Code": "string",
+				"new_Count": "int",
+				"new_Amount": "decimal",
+				"new_When": "datetime",
+				"new_Active": "bool",
 			},
 		)
 		created_this_run = True if table_info and table_info.get("columns_created") else False
@@ -232,9 +232,9 @@ except Exception as e:
 print("Cleanup (Metadata):")
 try:
 	# Delete if present, regardless of whether it was created in this run
-	info = client.get_table_info("SampleItem")
+	info = client.get_table_info("new_SampleItem")
 	if info:
-		client.delete_table("SampleItem")
+		client.delete_table("new_SampleItem")
 		print({"table_deleted": True})
 	else:
 		print({"table_deleted": False, "reason": "not found"})

@@ -174,8 +174,8 @@ def ensure_table():
     if existing:
         print({"table": TABLE_SCHEMA_NAME, "existed": True})
         return existing
-    log("client.create_table('new_FileSample', schema={title})")
-    info = client.create_table(TABLE_SCHEMA_NAME, {"title": "string"})
+    log("client.create_table('new_FileSample', schema={'new_Title': 'string'})")
+    info = client.create_table(TABLE_SCHEMA_NAME, {"new_Title": "string"})
     print({"table": TABLE_SCHEMA_NAME, "existed": False, "metadata_id": info.get('metadata_id')})
     return info
 
@@ -401,8 +401,8 @@ if run_chunk:
 # --------------------------- Cleanup ---------------------------
 if cleanup_record and record_id:
     try:
-        log(f"client.delete('{entity_set}', '{record_id}')")
-        backoff(lambda: client.delete(entity_set, record_id))
+        log(f"client.delete('{logical}', '{record_id}')")
+        backoff(lambda: client.delete(logical, record_id))
         print({"record_deleted": True})
     except Exception as e:  # noqa: BLE001
         print({"record_deleted": False, "error": str(e)})

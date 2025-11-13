@@ -78,30 +78,31 @@ def ensure_test_table(client: DataverseClient) -> Dict[str, Any]:
     print("\n📋 Test Table Setup")
     print("=" * 50)
     
-    table_schema = "TestSDKFunctionality"
+    tablename = "test_TestSDKFunctionality"
     
     try:
         # Check if table already exists
-        existing_table = client.get_table_info(table_schema)
+        existing_table = client.get_table_info(tablename)
         if existing_table:
-            print(f"✅ Test table '{table_schema}' already exists")
+            print(f"✅ Test table '{tablename}' already exists")
             return existing_table
             
     except Exception:
-        print(f"📝 Table '{table_schema}' not found, creating...")
+        print(f"📝 Table '{tablename}' not found, creating...")
     
     try:
         print("🔨 Creating new test table...")
         # Create the test table with various field types
         table_info = client.create_table(
-            table_schema,
+            tablename,
+            primary_column_name="test_name",
+            schema=
             {
-                "name": "string",           # Primary name field
-                "description": "string",    # Description field
-                "count": "int",            # Integer field
-                "amount": "decimal",       # Decimal field
-                "is_active": "bool",       # Boolean field
-                "created_date": "datetime" # DateTime field
+                "test_description": "string",   # Description field
+                "test_count": "int",            # Integer field
+                "test_amount": "decimal",       # Decimal field
+                "test_is_active": "bool",       # Boolean field
+                "test_created_date": "datetime" # DateTime field
             }
         )
         
