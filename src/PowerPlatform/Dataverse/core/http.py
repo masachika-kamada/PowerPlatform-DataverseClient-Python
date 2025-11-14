@@ -4,9 +4,9 @@
 """
 HTTP client with automatic retry logic and timeout handling.
 
-This module provides :class:`HttpClient`, a wrapper around the requests library
-that adds configurable retry behavior for transient network errors and
-intelligent timeout management based on HTTP method types.
+This module provides :class:`~PowerPlatform.Dataverse.core.http.HttpClient`, a wrapper
+around the requests library that adds configurable retry behavior for transient
+network errors and intelligent timeout management based on HTTP method types.
 """
 
 from __future__ import annotations
@@ -25,16 +25,15 @@ class HttpClient:
     management for different HTTP methods.
     
     :param retries: Maximum number of retry attempts for transient errors. Default is 5.
-    :type retries: int or None
+    :type retries: ``int`` | ``None``
     :param backoff: Base delay in seconds between retry attempts. Default is 0.5.
-    :type backoff: float or None
+    :type backoff: ``float`` | ``None``
     :param timeout: Default request timeout in seconds. If None, uses per-method defaults.
-    :type timeout: float or None
+    :type timeout: ``float`` | ``None``
     """
     
     def __init__(
         self,
-        *,
         retries: Optional[int] = None,
         backoff: Optional[float] = None,
         timeout: Optional[float] = None,
@@ -51,12 +50,12 @@ class HttpClient:
         and retries on network errors with exponential backoff.
         
         :param method: HTTP method (GET, POST, PUT, DELETE, etc.).
-        :type method: str
+        :type method: ``str``
         :param url: Target URL for the request.
-        :type url: str
+        :type url: ``str``
         :param kwargs: Additional arguments passed to ``requests.request()``, including headers, data, etc.
         :return: HTTP response object.
-        :rtype: requests.Response
+        :rtype: ``requests.Response``
         :raises requests.exceptions.RequestException: If all retry attempts fail.
         """
         # If no timeout is provided, use the user-specified default timeout if set;
