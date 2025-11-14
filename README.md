@@ -218,7 +218,7 @@ table_info = client.create_table("new_Product", {
 # Create with custom primary column name and solution assignment
 table_info = client.create_table(
     table_schema_name="new_Product",
-    schema={
+    columns={
         "new_Code": "string",
         "new_Price": "decimal"
     },

@@ -469,7 +469,7 @@ class DataverseClient:
                     ACTIVE = 1
                     INACTIVE = 2
 
-                schema = {
+                columns = {
                     "new_Title": "string",      # Note: includes 'new_' customization prefix value
                     "new_Quantity": "int",
                     "new_Price": "decimal",
@@ -477,7 +477,7 @@ class DataverseClient:
                     "new_Status": ItemStatus
                 }
 
-                result = client.create_table("new_SampleItem", schema)
+                result = client.create_table("new_SampleItem", columns)
                 print(f"Created table: {result['table_logical_name']}")
                 print(f"Columns: {result['columns_created']}")
 
