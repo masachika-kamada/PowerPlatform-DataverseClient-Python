@@ -2,10 +2,7 @@
 # Licensed under the MIT license.
 
 """
-Optional extensions for the Dataverse SDK.
-
-This module contains optional features like CLI interfaces, async clients,
-and other extended functionality.
+Optional extensions for the Dataverse SDK. Currently a placeholder.
 """
 
 # Will be populated with extensions as they are created
