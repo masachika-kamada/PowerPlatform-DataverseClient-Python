@@ -187,7 +187,7 @@ except Exception as e:  # noqa: BLE001
     sys.exit(1)
 
 entity_set = table_info.get("entity_set_name")
-table_schema_name = table_info.get("table_schema_name") or entity_set.rstrip("s")
+table_schema_name = table_info.get("table_schema_name")
 attr_prefix = table_schema_name.split('_',1)[0] if '_' in table_schema_name else table_schema_name
 name_attr = f"{attr_prefix}_name"
 small_file_attr_schema = f"{attr_prefix}_SmallDocument"  # second file attribute for small single-request demo
@@ -264,7 +264,7 @@ try:
         record_id = created_ids[0]
     else:
         raise RuntimeError("Unexpected create return; expected list[str] with at least one GUID")
-    print({"record_created": True, "id": record_id, "logical": table_schema_name})
+    print({"record_created": True, "id": record_id, "table schema name": table_schema_name})
 except Exception as e:  # noqa: BLE001
     print({"record_created": False, "error": str(e)})
     sys.exit(1)

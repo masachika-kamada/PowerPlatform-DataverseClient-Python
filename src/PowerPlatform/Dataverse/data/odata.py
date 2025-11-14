@@ -169,7 +169,7 @@ class ODataClient(ODataFileUpload):
         table_schema_name : str
             Table schema name.
         record : dict[str, Any]
-            Attribute payload mapped by logical column names.
+            Attribute payload mapped by column schema names.
 
         Returns
         -------
@@ -212,11 +212,11 @@ class ODataClient(ODataFileUpload):
         table_schema_name : str
             Table schema name.
         records : list[dict[str, Any]]
-            Payloads mapped by logical attribute names.
+            Payloads mapped by column schema names.
 
         Multi-create logical name resolution
         ------------------------------------
-        - If any payload omits ``@odata.type`` the client stamps ``Microsoft.Dynamics.CRM.<table_schema_name>``.
+        - If any payload omits ``@odata.type`` the client stamps ``Microsoft.Dynamics.CRM.<table_logical_name>``.
         - If all payloads already include ``@odata.type`` no modification occurs.
         
         Returns
@@ -666,22 +666,22 @@ class ODataClient(ODataFileUpload):
         return m.group(1).lower()
 
     # ---------------------- Entity set resolution -----------------------
-    def _entity_set_from_schema_name(self, logical: str) -> str:
-        """Resolve entity set name (plural) from a logical (singular) name using metadata.
+    def _entity_set_from_schema_name(self, table_schema_name: str) -> str:
+        """Resolve entity set name (plural) from a schema name (singular) name using metadata.
 
         Caches results for subsequent queries. Case-insensitive.
         """
-        if not logical:
-            raise ValueError("logical name required")
+        if not table_schema_name:
+            raise ValueError("table schema name required")
         
         # Use normalized (lowercase) key for cache lookup
-        cache_key = self._normalize_cache_key(logical)
+        cache_key = self._normalize_cache_key(table_schema_name)
         cached = self._logical_to_entityset_cache.get(cache_key)
         if cached:
             return cached
         url = f"{self.api}/EntityDefinitions"
         # LogicalName in Dataverse is stored in lowercase, so we need to lowercase for the filter
-        logical_lower = logical.lower()
+        logical_lower = table_schema_name.lower()
         logical_escaped = self._escape_odata_quotes(logical_lower)
         params = {
             "$select": "LogicalName,EntitySetName,PrimaryIdAttribute",
@@ -694,16 +694,16 @@ class ODataClient(ODataFileUpload):
         except ValueError:
             items = []
         if not items:
-            plural_hint = " (did you pass a plural entity set name instead of the singular logical name?)" if logical.endswith("s") and not logical.endswith("ss") else ""
+            plural_hint = " (did you pass a plural entity set name instead of the singular table schema name?)" if table_schema_name.endswith("s") and not table_schema_name.endswith("ss") else ""
             raise MetadataError(
-                f"Unable to resolve entity set for logical name '{logical}'. Provide the singular logical name.{plural_hint}",
+                f"Unable to resolve entity set for table schema name '{table_schema_name}'. Provide the singular table schema name.{plural_hint}",
                 subcode=ec.METADATA_ENTITYSET_NOT_FOUND,
             )
         md = items[0]
         es = md.get("EntitySetName")
         if not es:
             raise MetadataError(
-                f"Metadata response missing EntitySetName for logical '{logical}'.",
+                f"Metadata response missing EntitySetName for table schema name '{table_schema_name}'.",
                 subcode=ec.METADATA_ENTITYSET_NAME_MISSING,
             )
         self._logical_to_entityset_cache[cache_key] = es
@@ -730,12 +730,12 @@ class ODataClient(ODataFileUpload):
         parts = re.split(r"[^A-Za-z0-9]+", name)
         return "".join(p[:1].upper() + p[1:] for p in parts if p)
 
-    def _get_entity_by_logical_name(
+    def _get_entity_by_table_schema_name(
         self,
-        logical_name: str,
+        table_schema_name: str,
         headers: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Get entity metadata by LogicalName. Case-insensitive.
+        """Get entity metadata by table schema name. Case-insensitive.
         
         Note: LogicalName is stored lowercase in Dataverse, so we lowercase the input
         for case-insensitive matching. The response includes SchemaName, LogicalName,
@@ -743,7 +743,7 @@ class ODataClient(ODataFileUpload):
         """
         url = f"{self.api}/EntityDefinitions"
         # LogicalName is stored lowercase, so we lowercase the input for lookup
-        logical_lower = logical_name.lower()
+        logical_lower = table_schema_name.lower()
         logical_escaped = self._escape_odata_quotes(logical_lower)
         params = {
             "$select": "MetadataId,LogicalName,SchemaName,EntitySetName",
@@ -777,7 +777,7 @@ class ODataClient(ODataFileUpload):
         if solution_unique_name:
             params = {"SolutionUniqueName": solution_unique_name}
         self._request("post", url, json=payload, params=params)
-        ent = self._get_entity_by_logical_name(
+        ent = self._get_entity_by_table_schema_name(
             table_schema_name,
             headers={"Consistency": "Strong"},
         )
@@ -1171,7 +1171,7 @@ class ODataClient(ODataFileUpload):
         dict | None
             Metadata summary or ``None`` if not found.
         """
-        ent = self._get_entity_by_logical_name(table_schema_name)
+        ent = self._get_entity_by_table_schema_name(table_schema_name)
         if not ent:
             return None
         return {
@@ -1193,7 +1193,7 @@ class ODataClient(ODataFileUpload):
 
     def _delete_table(self, table_schema_name: str) -> None:
         """Delete a table by SchemaName. Case-insensitive."""
-        ent = self._get_entity_by_logical_name(table_schema_name)
+        ent = self._get_entity_by_table_schema_name(table_schema_name)
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",
@@ -1215,7 +1215,7 @@ class ODataClient(ODataFileUpload):
         The server will determine the LogicalName automatically (usually lowercased SchemaName).
         """
         # Check if table already exists (case-insensitive)
-        ent = self._get_entity_by_logical_name(table_schema_name)
+        ent = self._get_entity_by_table_schema_name(table_schema_name)
         if ent:
             raise MetadataError(
                 f"Table '{table_schema_name}' already exists.",
@@ -1270,7 +1270,7 @@ class ODataClient(ODataFileUpload):
         if not isinstance(columns, dict) or not columns:
             raise TypeError("columns must be a non-empty dict[name -> type]")
         
-        ent = self._get_entity_by_logical_name(table_schema_name)
+        ent = self._get_entity_by_table_schema_name(table_schema_name)
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",
@@ -1316,7 +1316,7 @@ class ODataClient(ODataFileUpload):
             if not isinstance(name, str) or not name.strip():
                 raise ValueError("column names must be non-empty strings")
 
-        ent = self._get_entity_by_logical_name(table_schema_name)
+        ent = self._get_entity_by_table_schema_name(table_schema_name)
         if not ent or not ent.get("MetadataId"):
             raise MetadataError(
                 f"Table '{table_schema_name}' not found.",

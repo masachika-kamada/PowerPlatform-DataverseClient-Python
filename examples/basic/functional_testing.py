@@ -123,9 +123,9 @@ def test_create_record(client: DataverseClient, table_info: Dict[str, Any]) -> s
     """Test record creation."""
     print("\n📝 Record Creation Test")
     print("=" * 50)
-    
-    logical_name = table_info.get("table_logical_name")
-    attr_prefix = logical_name.split("_", 1)[0] if "_" in logical_name else logical_name
+
+    table_schema_name = table_info.get("table_schema_name")
+    attr_prefix = table_schema_name.split("_", 1)[0] if "_" in table_schema_name else table_schema_name
     
     # Create test record data
     test_data = {
@@ -139,7 +139,7 @@ def test_create_record(client: DataverseClient, table_info: Dict[str, Any]) -> s
     
     try:
         print("🚀 Creating test record...")
-        created_ids = client.create(logical_name, test_data)
+        created_ids = client.create(table_schema_name, test_data)
         
         if isinstance(created_ids, list) and created_ids:
             record_id = created_ids[0]
@@ -163,12 +163,12 @@ def test_read_record(client: DataverseClient, table_info: Dict[str, Any], record
     print("\n📖 Record Reading Test")
     print("=" * 50)
     
-    logical_name = table_info.get("table_logical_name")
-    attr_prefix = logical_name.split("_", 1)[0] if "_" in logical_name else logical_name
+    table_schema_name = table_info.get("table_schema_name")
+    attr_prefix = table_schema_name.split("_", 1)[0] if "_" in table_schema_name else table_schema_name
     
     try:
         print(f"🔍 Reading record: {record_id}")
-        record = client.get(logical_name, record_id)
+        record = client.get(table_schema_name, record_id)
         
         if record:
             print("✅ Record retrieved successfully!")
@@ -198,15 +198,15 @@ def test_query_records(client: DataverseClient, table_info: Dict[str, Any]) -> N
     print("\n🔍 Record Query Test")
     print("=" * 50)
     
-    logical_name = table_info.get("table_logical_name")
-    attr_prefix = logical_name.split("_", 1)[0] if "_" in logical_name else logical_name
+    table_schema_name = table_info.get("table_schema_name")
+    attr_prefix = table_schema_name.split("_", 1)[0] if "_" in table_schema_name else table_schema_name
     
     try:
         print("🔍 Querying records from test table...")
         
         # Query with filter and select
         records_iterator = client.get(
-            logical_name,
+            table_schema_name,
             select=[f"{attr_prefix}_name", f"{attr_prefix}_count", f"{attr_prefix}_amount"],
             filter=f"{attr_prefix}_is_active eq true",
             top=5,
@@ -234,14 +234,14 @@ def cleanup_test_data(client: DataverseClient, table_info: Dict[str, Any], recor
     print("\n🧹 Cleanup")
     print("=" * 50)
     
-    logical_name = table_info.get("table_logical_name")
+    table_schema_name = table_info.get("table_schema_name")
     
     # Ask user if they want to clean up
     cleanup_choice = input("Do you want to delete the test record? (y/N): ").strip().lower()
     
     if cleanup_choice in ['y', 'yes']:
         try:
-            client.delete(logical_name, record_id)
+            client.delete(table_schema_name, record_id)
             print("✅ Test record deleted successfully")
         except Exception as e:
             print(f"⚠️  Failed to delete test record: {e}")

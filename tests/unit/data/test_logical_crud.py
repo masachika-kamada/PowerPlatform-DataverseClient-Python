@@ -38,7 +38,7 @@ class TestableClient(ODataClient):
     def __init__(self, responses):
         super().__init__(DummyAuth(), "https://org.example", None)
         self._http = DummyHTTPClient(responses)
-    def _convert_labels_to_ints(self, logical_name, record):  # pragma: no cover - test shim
+    def _convert_labels_to_ints(self, table_schema_name, record):  # pragma: no cover - test shim
         return record
 
 # Helper metadata response for logical name resolution
@@ -116,7 +116,7 @@ def test_get_multiple_paging():
     assert pages == [[{"accountid": "1"}], [{"accountid": "2"}]]
 
 
-def test_unknown_logical_name_raises():
+def test_unknown_table_schema_name_raises():
     responses = [
         (200, {}, {"value": []}),  # metadata lookup returns empty
     ]

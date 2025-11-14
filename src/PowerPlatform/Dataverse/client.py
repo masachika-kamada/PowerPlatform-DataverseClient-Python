@@ -108,7 +108,7 @@ class DataverseClient:
         :param table_schema_name: Table schema name (e.g. ``"account"``, ``"contact"``, or ``"new_customtable"``).
         :type table_schema_name: str
         :param records: A single record dictionary or a list of record dictionaries.
-            Each dictionary should contain attribute logical names as keys.
+            Each dictionary should contain attribute schema names as keys.
         :type records: dict or list[dict]
 
         :return: List of created record GUIDs. Returns a single-element list for a single input.
@@ -273,7 +273,7 @@ class DataverseClient:
         :type table_schema_name: str
         :param record_id: Optional GUID to fetch a specific record. If None, queries multiple records.
         :type record_id: str or None
-        :param select: Optional list of attribute logical names to retrieve. Column names are
+        :param select: Optional list of column schema names to retrieve. Column names are
             case-insensitive and automatically lowercased (e.g. ``["new_Title", "new_Amount"]``
             becomes ``"new_title,new_amount"``).
         :type select: list[str] or None
@@ -478,7 +478,7 @@ class DataverseClient:
                 }
 
                 result = client.create_table("new_SampleItem", columns)
-                print(f"Created table: {result['table_logical_name']}")
+                print(f"Created table: {result['table_schema_name']}")
                 print(f"Columns: {result['columns_created']}")
 
             Create a table with a custom primary column name::
