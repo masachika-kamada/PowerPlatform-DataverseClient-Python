@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+"""Dataverse Web API client with CRUD, SQL query, and table/column metadata management."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, List, Union, Iterable
@@ -38,6 +40,18 @@ class ODataClient(ODataFileUpload):
         base_url: str,
         config=None,
     ) -> None:
+        """Initialize the OData client.
+
+        Sets up authentication, base URL, configuration, and internal caches.
+
+        :param auth: Authentication manager providing ``acquire_token(scope)`` that returns an object with ``access_token``.
+        :type auth: ~PowerPlatform.Dataverse.core.auth.AuthManager
+        :param base_url: Organization base URL (e.g. ``"https://<org>.crm.dynamics.com"``).
+        :type base_url: ``str``
+        :param config: Optional Dataverse configuration (HTTP retry, backoff, timeout, language code). If omitted ``DataverseConfig.from_env()`` is used.
+        :type config: ~PowerPlatform.Dataverse.core.config.DataverseConfig | ``None``
+        :raises ValueError: If ``base_url`` is empty after stripping.
+        """
         self.auth = auth
         self.base_url = (base_url or "").rstrip("/")
         if not self.base_url:
@@ -136,24 +150,18 @@ class ODataClient(ODataFileUpload):
     def _create(self, entity_set: str, logical_name: str, record: Dict[str, Any]) -> str:
         """Create a single record and return its GUID.
 
-        Parameters
-        -------
-        entity_set : str
-            Resolved entity set (plural) name.
-        logical_name : str
-            Singular logical entity name.
-        record : dict[str, Any]
-            Attribute payload mapped by logical column names.
+        :param entity_set: Resolved entity set (plural) name.
+        :type entity_set: ``str``
+        :param logical_name: Singular logical entity name.
+        :type logical_name: ``str``
+        :param record: Attribute payload mapped by logical column names.
+        :type record: ``dict[str, Any]``
 
-        Returns
-        -------
-        str
-            Created record GUID.
+        :return: Created record GUID.
+        :rtype: ``str``
 
-        Notes
-        -------
-        Relies on OData-EntityId (canonical) or Location header. No response body parsing is performed.
-        Raises RuntimeError if neither header contains a GUID.
+        .. note::
+           Relies on ``OData-EntityId`` (canonical) or ``Location`` response header. No response body parsing is performed. Raises ``RuntimeError`` if neither header contains a GUID.
         """
         record = self._convert_labels_to_ints(logical_name, record)
         url = f"{self.api}/{entity_set}"
@@ -175,26 +183,20 @@ class ODataClient(ODataFileUpload):
         )
 
     def _create_multiple(self, entity_set: str, logical_name: str, records: List[Dict[str, Any]]) -> List[str]:
-        """Create multiple records using the collection-bound CreateMultiple action.
+        """Create multiple records using the collection-bound ``CreateMultiple`` action.
 
-        Parameters
-        ----------
-        entity_set : str
-            Resolved entity set (plural) name.
-        logical_name : str
-            Singular logical entity name.
-        records : list[dict[str, Any]]
-            Payloads mapped by logical attribute names.
+        :param entity_set: Resolved entity set (plural) name.
+        :type entity_set: ``str``
+        :param logical_name: Singular logical entity name.
+        :type logical_name: ``str``
+        :param records: Payload dictionaries mapped by logical attribute names.
+        :type records: ``list[dict[str, Any]]``
 
-        Multi-create logical name resolution
-        ------------------------------------
-        - If any payload omits ``@odata.type`` the client stamps ``Microsoft.Dynamics.CRM.<logical_name>``.
-        - If all payloads already include ``@odata.type`` no modification occurs.
-        
-        Returns
-        -------
-        list[str]
-            List of created IDs.
+        :return: List of created record GUIDs (may be empty if response lacks IDs).
+        :rtype: ``list[str]``
+
+        .. note::
+           Logical type stamping: if any payload omits ``@odata.type`` the client injects ``Microsoft.Dynamics.CRM.<logical_name>``. If all payloads already include ``@odata.type`` no modification occurs.
         """
         if not all(isinstance(r, dict) for r in records):
             raise TypeError("All items for multi-create must be dicts")
@@ -254,16 +256,17 @@ class ODataClient(ODataFileUpload):
         )
 
     def _update_by_ids(self, logical_name: str, ids: List[str], changes: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
-        """Update many records by GUID list using UpdateMultiple under the hood.
+        """Update many records by GUID list using the collection-bound ``UpdateMultiple`` action.
 
-        Parameters
-        ----------
-        logical_name : str
-            Logical name (singular).
-        ids : list[str]
-            GUIDs of target records.
-        changes : dict | list[dict]
-            Broadcast patch (dict) applied to all IDs, or list of per-record patches (1:1 with ids).
+        :param logical_name: Logical (singular) entity name.
+        :type logical_name: ``str``
+        :param ids: GUIDs of target records.
+        :type ids: ``list[str]``
+        :param changes: Broadcast patch (``dict``) applied to all IDs, or list of per-record patches (1:1 with ``ids``).
+        :type changes: ``dict`` | ``list[dict]``
+
+        :return: ``None``
+        :rtype: ``None``
         """
         if not isinstance(ids, list):
             raise TypeError("ids must be list[str]")
@@ -292,9 +295,15 @@ class ODataClient(ODataFileUpload):
         logical_name: str,
         ids: List[str],
     ) -> Optional[str]:
-        """Delete many records by GUID list.
+        """Delete many records by GUID list via the ``BulkDelete`` action.
 
-        Returns the asynchronous job identifier reported by the BulkDelete action.
+        :param logical_name: Logical (singular) entity name.
+        :type logical_name: ``str``
+        :param ids: GUIDs of records to delete.
+        :type ids: ``list[str]``
+
+        :return: BulkDelete asynchronous job identifier when executed in bulk; ``None`` if no IDs provided or single deletes performed.
+        :rtype: ``str`` | ``None``
         """
         targets = [rid for rid in ids if rid]
         if not targets:
@@ -366,20 +375,16 @@ class ODataClient(ODataFileUpload):
         return f"({k})"
 
     def _update(self, logical_name: str, key: str, data: Dict[str, Any]) -> None:
-        """Update an existing record.
+        """Update an existing record by GUID or alternate key.
 
-        Parameters
-        ----------
-        logical_name : str
-            Logical (singular) entity name.
-        key : str
-            Record GUID (with or without parentheses) or alternate key.
-        data : dict
-            Partial entity payload.
-
-        Returns
-        -------
-        None
+        :param logical_name: Logical (singular) entity name.
+        :type logical_name: ``str``
+        :param key: Record GUID (with or without parentheses) or alternate key syntax.
+        :type key: ``str``
+        :param data: Partial entity payload (attributes to patch).
+        :type data: ``dict[str, Any]``
+        :return: ``None``
+        :rtype: ``None``
         """
         data = self._convert_labels_to_ints(logical_name, data)
         entity_set = self._entity_set_from_logical(logical_name)
@@ -387,34 +392,22 @@ class ODataClient(ODataFileUpload):
         r = self._request("patch", url, headers={"If-Match": "*"}, json=data)
 
     def _update_multiple(self, entity_set: str, logical_name: str, records: List[Dict[str, Any]]) -> None:
-        """Bulk update existing records via the collection-bound UpdateMultiple action.
+        """Bulk update existing records via the collection-bound ``UpdateMultiple`` action.
 
-        Parameters
-        ----------
-        entity_set : str
-            Resolved entity set name.
-        logical_name : str
-            Logical (singular) name, e.g. "account".
-        records : list[dict]
-            Each dict must include the real primary key attribute for the entity (e.g. ``accountid``) and one or more
-            fields to update. If ``@odata.type`` is omitted in any payload, the logical name is resolved once and
-            stamped into those payloads as ``Microsoft.Dynamics.CRM.<logical>`` (same behaviour as bulk create).
+        :param entity_set: Resolved entity set (plural) name.
+        :type entity_set: ``str``
+        :param logical_name: Logical (singular) name (e.g. ``"account"``).
+        :type logical_name: ``str``
+        :param records: List of patch dictionaries. Each must include the true primary key attribute (e.g. ``accountid``) and one or more fields to update.
+        :type records: ``list[dict[str, Any]]``
+        :return: ``None``
+        :rtype: ``None``
 
-        Behaviour
-        ---------
-        - POST ``/{entity_set}/Microsoft.Dynamics.CRM.UpdateMultiple`` with body ``{"Targets": [...]}``.
-        - Expects Dataverse transactional semantics: if any individual update fails the entire request is rolled back.
-        - Response content is ignored; no stable contract for returned IDs or representations.
-
-        Returns
-        -------
-        None
-            No representation is returned (symmetry with single update).
-
-        Notes
-        -----
-        - Caller must include the correct primary key attribute (e.g. ``accountid``) in every record.
-        - Both single and multiple updates return None.
+        .. note::
+           - Endpoint: ``POST /{entity_set}/Microsoft.Dynamics.CRM.UpdateMultiple`` with body ``{"Targets": [...]}``.
+           - Transactional semantics: if any individual update fails, the entire request rolls back.
+           - Response content is ignored; no stable contract for returned IDs/representations.
+           - Caller must supply the correct primary key attribute (e.g. ``accountid``) in every record.
         """
         if not isinstance(records, list) or not records or not all(isinstance(r, dict) for r in records):
             raise TypeError("records must be a non-empty list[dict]")
@@ -438,7 +431,16 @@ class ODataClient(ODataFileUpload):
         return None
 
     def _delete(self, logical_name: str, key: str) -> None:
-        """Delete a record by GUID or alternate key."""
+        """Delete a record by GUID or alternate key.
+
+        :param logical_name: Singular logical entity name.
+        :type logical_name: ``str``
+        :param key: Record GUID (with or without parentheses) or alternate key syntax.
+        :type key: ``str``
+
+        :return: ``None``
+        :rtype: ``None``
+        """
         entity_set = self._entity_set_from_logical(logical_name)
         url = f"{self.api}/{entity_set}{self._format_key(key)}"
         self._request("delete", url, headers={"If-Match": "*"})
@@ -446,14 +448,15 @@ class ODataClient(ODataFileUpload):
     def _get(self, logical_name: str, key: str, select: Optional[str] = None) -> Dict[str, Any]:
         """Retrieve a single record.
 
-        Parameters
-        ----------
-        logical_name : str
-            Logical (singular) name.
-        key : str
-            Record GUID (with or without parentheses) or alternate key syntax.
-        select : str | None
-            Comma separated columns for $select.
+        :param logical_name: Singular logical entity name.
+        :type logical_name: ``str``
+        :param key: Record GUID (with or without parentheses) or alternate key syntax.
+        :type key: ``str``
+        :param select: Comma separated columns for ``$select`` (optional).
+        :type select: ``str`` | ``None``
+
+        :return: Retrieved record dictionary (may be empty if no selected attributes).
+        :rtype: ``dict[str, Any]``
         """
         params = {}
         if select:
@@ -475,27 +478,23 @@ class ODataClient(ODataFileUpload):
     ) -> Iterable[List[Dict[str, Any]]]:
         """Iterate records from an entity set, yielding one page (list of dicts) at a time.
 
-        Parameters
-        ----------
-        logical_name : str
-            Logical (singular) entity name.
-        select : list[str] | None
-            Columns to select; joined with commas into $select.
-        filter : str | None
-            OData $filter expression as a string.
-        orderby : list[str] | None
-            Order expressions; joined with commas into $orderby.
-        top : int | None
-            Max number of records across all pages. Passed as $top on the first request; the server will paginate via nextLink as needed.
-        expand : list[str] | None
-            Navigation properties to expand; joined with commas into $expand.
-        page_size : int | None
-            Hint for per-page size using Prefer: ``odata.maxpagesize``.
+        :param logical_name: Singular logical entity name.
+        :type logical_name: ``str``
+        :param select: Columns to include (``$select``) or ``None``.
+        :type select: ``list[str]`` | ``None``
+        :param filter: OData ``$filter`` expression or ``None``.
+        :type filter: ``str`` | ``None``
+        :param orderby: Order expressions (``$orderby``) or ``None``.
+        :type orderby: ``list[str]`` | ``None``
+        :param top: Max total records (applied on first request as ``$top``) or ``None``.
+        :type top: ``int`` | ``None``
+        :param expand: Navigation properties to expand (``$expand``) or ``None``.
+        :type expand: ``list[str]`` | ``None``
+        :param page_size: Per-page size hint via ``Prefer: odata.maxpagesize``.
+        :type page_size: ``int`` | ``None``
 
-        Yields
-        ------
-        list[dict]
-            A page of records from the Web API (the "value" array for each page).
+        :return: Iterator yielding pages (each page is a ``list`` of record dicts).
+        :rtype: ``Iterable[list[dict[str, Any]]]``
         """
 
         extra_headers: Dict[str, str] = {}
@@ -544,30 +543,19 @@ class ODataClient(ODataFileUpload):
 
     # --------------------------- SQL Custom API -------------------------
     def _query_sql(self, sql: str) -> list[dict[str, Any]]:
-        """Execute a read-only SQL query using the Dataverse Web API `?sql=` capability.
+        """Execute a read-only SQL SELECT using the Dataverse Web API ``?sql=`` capability.
 
-        The platform supports a constrained subset of SQL SELECT statements directly on entity set endpoints:
-            GET /{entity_set}?sql=<encoded select statement>
+        :param sql: Single SELECT statement within the supported subset.
+        :type sql: ``str``
 
-        This client extracts the logical table name from the query, resolves the corresponding
-        entity set name (cached) and invokes the Web API using the `sql` query parameter.
+        :return: Result rows (empty list if none).
+        :rtype: ``list[dict[str, Any]]``
 
-        Parameters
-        ----------
-        sql : str
-            Single SELECT statement within supported subset.
+        :raises ValidationError: If ``sql`` is not a ``str`` or is empty.
+        :raises MetadataError: If logical table name resolution fails.
 
-        Returns
-        -------
-        list[dict]
-            Result rows (empty list if none).
-
-        Raises
-        ------
-        ValueError
-            If the SQL is empty or malformed, or if the table logical name cannot be determined.
-        RuntimeError
-            If metadata lookup for the logical name fails.
+        .. note::
+           Endpoint form: ``GET /{entity_set}?sql=<encoded select>``. The client extracts the logical table name, resolves the entity set (metadata cached), then issues the request. Only a constrained SELECT subset is supported by the platform.
         """
         if not isinstance(sql, str):
             raise ValidationError("sql must be a string", subcode=ec.VALIDATION_SQL_NOT_STRING)
@@ -1113,15 +1101,11 @@ class ODataClient(ODataFileUpload):
     def _get_table_info(self, tablename: str) -> Optional[Dict[str, Any]]:
         """Return basic metadata for a custom table if it exists.
 
-        Parameters
-        ----------
-        tablename : str
-            Friendly name or full schema name (with publisher prefix and underscore).
+        :param tablename: Friendly name (without prefix) or full schema name including publisher prefix (e.g. ``new_Sample``).
+        :type tablename: ``str``
 
-        Returns
-        -------
-        dict | None
-            Metadata summary or ``None`` if not found.
+        :return: Metadata summary or ``None`` if not found.
+        :rtype: ``dict[str, Any]`` | ``None``
         """
         ent = self._get_entity_by_schema(tablename)
         if not ent:
@@ -1135,7 +1119,13 @@ class ODataClient(ODataFileUpload):
         }
     
     def _list_tables(self) -> List[Dict[str, Any]]:
-        """List all tables in the Dataverse, excluding private tables (IsPrivate=true)."""
+        """List all non-private tables (``IsPrivate eq false``).
+
+        :return: Metadata entries for non-private tables (may be empty).
+        :rtype: ``list[dict[str, Any]]``
+
+        :raises HttpError: If the metadata request fails.
+        """
         url = f"{self.api}/EntityDefinitions"
         params = {
             "$filter": "IsPrivate eq false"
@@ -1144,6 +1134,17 @@ class ODataClient(ODataFileUpload):
         return r.json().get("value", [])
 
     def _delete_table(self, tablename: str) -> None:
+        """Delete a custom table by friendly or full schema name.
+
+        :param tablename: Friendly name (without publisher prefix) or full schema name (e.g. ``new_Sample``).
+        :type tablename: ``str``
+
+        :return: ``None``
+        :rtype: ``None``
+
+        :raises MetadataError: If the table does not exist.
+        :raises HttpError: If the delete request fails.
+        """
         entity_schema = self._normalize_entity_schema(tablename)
         ent = self._get_entity_by_schema(entity_schema)
         if not ent or not ent.get("MetadataId"):
@@ -1161,6 +1162,27 @@ class ODataClient(ODataFileUpload):
         schema: Dict[str, Any],
         solution_unique_name: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Create a custom table with specified columns.
+
+        Accepts a friendly base name (prefix omitted) or a full schema name (with publisher prefix). If
+        the provided ``tablename`` lacks an underscore, a schema name of the form ``new_<PascalName>`` is
+        synthesized; otherwise the given name is treated as the full schema name.
+
+        :param tablename: Friendly base name (e.g. ``"sample"``) or full schema name (e.g. ``"new_Sample"``).
+        :type tablename: ``str``
+        :param schema: Mapping of column name (friendly or full) -> type spec (``str`` or ``Enum`` subclass).
+        :type schema: ``dict[str, Any]``
+        :param solution_unique_name: Optional solution container for the new table; if provided must be non-empty.
+        :type solution_unique_name: ``str`` | ``None``
+
+        :return: Metadata summary for the created table including created column schema names.
+        :rtype: ``dict[str, Any]``
+
+        :raises MetadataError: If the table already exists.
+        :raises ValueError: If a column type is unsupported or ``solution_unique_name`` is empty.
+        :raises TypeError: If ``solution_unique_name`` is not a ``str`` when provided.
+        :raises HttpError: If underlying HTTP requests fail.
+        """
         # Accept a friendly name and construct a default schema under 'new_'.
         # If a full SchemaName is passed (contains '_'), use as-is.
         entity_schema = self._normalize_entity_schema(tablename)
@@ -1210,6 +1232,21 @@ class ODataClient(ODataFileUpload):
         tablename: str,
         columns: Dict[str, Any],
     ) -> List[str]:
+        """Create new columns on an existing table.
+
+        :param tablename: Friendly base name or full schema name of the table.
+        :type tablename: ``str``
+        :param columns: Mapping of column name (friendly or full) -> type spec (``str`` or ``Enum`` subclass).
+        :type columns: ``dict[str, Any]``
+
+        :return: List of created column schema names.
+        :rtype: ``list[str]``
+
+        :raises TypeError: If ``columns`` is not a non-empty dict.
+        :raises MetadataError: If the target table does not exist.
+        :raises ValueError: If a column type is unsupported.
+        :raises HttpError: If an underlying HTTP request fails.
+        """
         if not isinstance(columns, dict) or not columns:
             raise TypeError("columns must be a non-empty dict[name -> type]")
         entity_schema = self._normalize_entity_schema(tablename)
@@ -1248,6 +1285,22 @@ class ODataClient(ODataFileUpload):
         tablename: str,
         columns: Union[str, List[str]],
     ) -> List[str]:
+        """Delete one or more columns from a table.
+
+        :param tablename: Friendly base name or full schema name of the table.
+        :type tablename: ``str``
+        :param columns: Single column name or list of column names (friendly or full schema forms).
+        :type columns: ``str`` | ``list[str]``
+
+        :return: List of deleted column schema names (empty if none removed).
+        :rtype: ``list[str]``
+
+        :raises TypeError: If ``columns`` is neither a ``str`` nor ``list[str]``.
+        :raises ValueError: If any provided column name is empty.
+        :raises MetadataError: If the table or a specified column does not exist.
+        :raises RuntimeError: If column metadata lacks a required ``MetadataId``.
+        :raises HttpError: If an underlying delete request fails.
+        """
         if isinstance(columns, str):
             names = [columns]
         elif isinstance(columns, list):
@@ -1309,20 +1362,11 @@ class ODataClient(ODataFileUpload):
     ) -> int:
         """Flush cached client metadata/state.
 
-        Currently supported kinds:
-          - 'picklist': clears entries from the picklist label cache used by label -> int conversion.
-
-        Parameters
-        ----------
-        kind : str
-            Cache kind to flush. Only 'picklist' is implemented today. Future kinds
-            (e.g. 'entityset', 'primaryid') can be added without breaking the signature.
-
-        Returns
-        -------
-        int
-            Number of cache entries removed.
-
+        :param kind: Cache kind to flush (only ``"picklist"`` supported).
+        :type kind: ``str``
+        :return: Number of cache entries removed.
+        :rtype: ``int``
+        :raises ValidationError: If ``kind`` is unsupported.
         """
         k = (kind or "").strip().lower()
         if k != "picklist":
