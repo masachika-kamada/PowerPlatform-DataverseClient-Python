@@ -555,7 +555,7 @@ class ODataClient(ODataFileUpload):
         :raises MetadataError: If logical table name resolution fails.
 
         .. note::
-           Endpoint form: ``GET /{entity_set}?sql=<encoded select>``. The client extracts the logical table name, resolves the entity set (metadata cached), then issues the request. Only a constrained SELECT subsetis supported by the platform.
+           Endpoint form: ``GET /{entity_set}?sql=<encoded select>``. The client extracts the logical table name, resolves the entity set (metadata cached), then issues the request. Only a constrained SELECT subset is supported by the platform.
         """
         if not isinstance(sql, str):
             raise ValidationError("sql must be a string", subcode=ec.VALIDATION_SQL_NOT_STRING)
