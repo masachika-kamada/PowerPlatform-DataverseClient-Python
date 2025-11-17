@@ -18,7 +18,7 @@ def dummy_auth():
     """Mock authentication object for testing."""
 
     class DummyAuth:
-        def acquire_token(self, scope):
+        def _acquire_token(self, scope):
             class Token:
                 access_token = "test_token_12345"
 
@@ -37,7 +37,7 @@ def test_config():
 def mock_http_client():
     """Mock HTTP client for unit tests."""
     mock = Mock()
-    mock.request.return_value = Mock()
+    mock._request.return_value = Mock()
     return mock
 
 

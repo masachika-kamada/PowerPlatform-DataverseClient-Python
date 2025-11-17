@@ -3,12 +3,12 @@
 
 import types
 import pytest
-from PowerPlatform.Dataverse.data.odata import ODataClient
+from PowerPlatform.Dataverse.data._odata import _ODataClient
 from PowerPlatform.Dataverse.core.errors import MetadataError
 
 
 class DummyAuth:
-    def acquire_token(self, scope):
+    def _acquire_token(self, scope):
         class T:
             access_token = "x"
 
@@ -20,7 +20,7 @@ class DummyHTTPClient:
         self._responses = responses
         self.calls = []
 
-    def request(self, method, url, **kwargs):
+    def _request(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs))
         if not self._responses:
             raise AssertionError("No more dummy responses configured")
@@ -43,7 +43,7 @@ class DummyHTTPClient:
         return resp
 
 
-class MockableClient(ODataClient):
+class MockableClient(_ODataClient):
     def __init__(self, responses):
         super().__init__(DummyAuth(), "https://org.example", None)
         self._http = DummyHTTPClient(responses)

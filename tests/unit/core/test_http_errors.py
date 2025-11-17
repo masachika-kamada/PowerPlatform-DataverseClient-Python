@@ -3,12 +3,12 @@
 
 import pytest
 from PowerPlatform.Dataverse.core.errors import HttpError
-from PowerPlatform.Dataverse.core.error_codes import HTTP_404, HTTP_429, HTTP_500
-from PowerPlatform.Dataverse.data.odata import ODataClient
+from PowerPlatform.Dataverse.core._error_codes import HTTP_404, HTTP_429, HTTP_500
+from PowerPlatform.Dataverse.data._odata import _ODataClient
 
 
 class DummyAuth:
-    def acquire_token(self, scope):
+    def _acquire_token(self, scope):
         class T:
             access_token = "x"
 
@@ -19,7 +19,7 @@ class DummyHTTP:
     def __init__(self, responses):
         self._responses = responses
 
-    def request(self, method, url, **kwargs):
+    def _request(self, method, url, **kwargs):
         if not self._responses:
             raise AssertionError("No more responses")
         status, headers, body = self._responses.pop(0)
@@ -49,7 +49,7 @@ class DummyHTTP:
         return r
 
 
-class MockClient(ODataClient):
+class MockClient(_ODataClient):
     def __init__(self, responses):
         super().__init__(DummyAuth(), "https://org.example", None)
         self._http = DummyHTTP(responses)

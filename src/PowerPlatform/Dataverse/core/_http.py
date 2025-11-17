@@ -4,7 +4,7 @@
 """
 HTTP client with automatic retry logic and timeout handling.
 
-This module provides :class:`~PowerPlatform.Dataverse.core.http.HttpClient`, a wrapper
+This module provides :class:`~PowerPlatform.Dataverse.core._http._HttpClient`, a wrapper
 around the requests library that adds configurable retry behavior for transient
 network errors and intelligent timeout management based on HTTP method types.
 """
@@ -17,7 +17,7 @@ from typing import Any, Optional
 import requests
 
 
-class HttpClient:
+class _HttpClient:
     """
     HTTP client with configurable retry logic and timeout handling.
 
@@ -25,11 +25,11 @@ class HttpClient:
     management for different HTTP methods.
 
     :param retries: Maximum number of retry attempts for transient errors. Default is 5.
-    :type retries: ``int`` | ``None``
+    :type retries: :class:`int` | None
     :param backoff: Base delay in seconds between retry attempts. Default is 0.5.
-    :type backoff: ``float`` | ``None``
+    :type backoff: :class:`float` | None
     :param timeout: Default request timeout in seconds. If None, uses per-method defaults.
-    :type timeout: ``float`` | ``None``
+    :type timeout: :class:`float` | None
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class HttpClient:
         self.base_delay = backoff if backoff is not None else 0.5
         self.default_timeout: Optional[float] = timeout
 
-    def request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
+    def _request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
         """
         Execute an HTTP request with automatic retry logic and timeout management.
 
@@ -50,12 +50,12 @@ class HttpClient:
         and retries on network errors with exponential backoff.
 
         :param method: HTTP method (GET, POST, PUT, DELETE, etc.).
-        :type method: ``str``
+        :type method: :class:`str`
         :param url: Target URL for the request.
-        :type url: ``str``
+        :type url: :class:`str`
         :param kwargs: Additional arguments passed to ``requests.request()``, including headers, data, etc.
         :return: HTTP response object.
-        :rtype: ``requests.Response``
+        :rtype: :class:`requests.Response`
         :raises requests.exceptions.RequestException: If all retry attempts fail.
         """
         # If no timeout is provided, use the user-specified default timeout if set;
